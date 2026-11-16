@@ -1,0 +1,91 @@
+# 期货日频 profile（schema 2.2.0：target_state + policy，角色在 target_state[*].role）
+# 证明「新增域＝加 yaml」，engine.py 一行不动。
+# 与 A 股的差异全部落在这里：复合主键、手数单位、涨跌停幅度规则。
+
+name: futures_daily
+version: "0.1.0"
+
+date_column: "日期"
+
+# 列级目标态：semantic 必填，role 只在跨列规则需要时声明
+target_state:
+  "合约代码":
+    semantic: symbol
+    dtype: object
+    role: key            # 复合主键第 1 列（声明顺序即拼接顺序）
+  "日期":
+    semantic: date
+    dtype: "datetime64[ns]"
+    order: asc
+    role: key            # 复合主键第 2 列
+    format: "%Y-%m-%d"
+  "开盘价":
+    semantic: price
+    dtype: float64
+  "最高价":
+    semantic: price
+    dtype: float64
+    role: high
+  "最低价":
+    semantic: price
+    dtype: float64
+    role: low
+  "收盘价":
+    semantic: price
+    dtype: float64
+    role: close
+  "成交量_手":
+    semantic: volume
+    dtype: float64
+    unit: 手
+  "持仓量":
+    semantic: open_interest
+    dtype: float64
+    unit: 手
+  "涨跌幅_%":
+    semantic: percent
+    dtype: float64
+    unit: "%"
+    # 涨跌停区间：边界属于「这一列应该长什么样」，不再是规则参数
+    range:
+      min: -10.0
+      max: 10.0
+
+# 行级决策范式：缺键会在 open 阶段被明确拒绝
+policy:
+  duplicate_keep: first
+  default_row_action: answer
+
+cross_column_rules:
+  - id: ohlc_consistency
+    involves: ["最高价", "最低价", "收盘价"]
+
+# 不写 synonyms：schema 保留该键但当前未接线（加载器不消费，不会据此改列名）。
+# 列名必须与本文件 target_state 的键逐字一致；改列名交给数据准备脚本，不交给 profile。
+
+missing_tokens: ["--", "暂无", "N/A"]
+
+units:
+  "成交量_手": "手"
+  "持仓量": "手"
+  "涨跌幅_%": "%"
+
+business_rules:
+  - id: missing_token
+    mode: auto
+  - duplicate_key
+  - ohlc_contradiction
+  - id: date_format
+    mode: auto
+  # 期货特有：涨跌停幅度约束，用通用 range_check 表达，会话层不含金融语义
+  # 边界在 target_state["涨跌幅_%"].range，这里只留「查哪列」与选项文案
+  - id: limit_up_down
+    type: range_check
+    column: "涨跌幅_%"
+    options: ["按边界裁剪", "跳过打标"]
+    default: "按边界裁剪"
+
+calendar:
+  market: CN
+  timezone: Asia/Shanghai
+  trade_days: weekdays

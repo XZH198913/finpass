@@ -1,0 +1,222 @@
+{
+  "a_stock_daily": [
+    {
+      "affected_row_keys": [
+        "2024-03-14"
+      ],
+      "default": "保留第一条",
+      "estimated_changes": 1,
+      "level": "strategy",
+      "options": [
+        "保留第一条",
+        "保留最后一条",
+        "跳过打标"
+      ],
+      "question_id": "q_dup_key",
+      "rule_id": "duplicate_key",
+      "sample_columns": [
+        "日期"
+      ],
+      "samples_count": 2
+    },
+    {
+      "affected_row_keys": [
+        "2024-03-12"
+      ],
+      "default": "填 NaN",
+      "estimated_changes": 1,
+      "level": "column",
+      "options": [
+        "填 NaN",
+        "跳过打标"
+      ],
+      "question_id": "q_missing_收盘价",
+      "rule_id": "missing_token",
+      "sample_columns": [
+        "日期",
+        "收盘价"
+      ],
+      "samples_count": 1
+    },
+    {
+      "affected_row_keys": [
+        "2024-03-13"
+      ],
+      "default": "填 NaN",
+      "estimated_changes": 1,
+      "level": "column",
+      "options": [
+        "填 NaN",
+        "跳过打标"
+      ],
+      "question_id": "q_missing_成交额_元",
+      "rule_id": "missing_token",
+      "sample_columns": [
+        "日期",
+        "成交额_元"
+      ],
+      "samples_count": 1
+    },
+    {
+      "affected_row_keys": [
+        "2024-03-19"
+      ],
+      "default": "按万元折算异常行",
+      "estimated_changes": 1,
+      "level": "column",
+      "options": [
+        "按万元折算异常行",
+        "跳过打标"
+      ],
+      "question_id": "q_unit_成交额_元",
+      "rule_id": "unit_ambiguity",
+      "sample_columns": [
+        "日期",
+        "成交额_元"
+      ],
+      "samples_count": 1
+    },
+    {
+      "affected_row_keys": [
+        "2024/03/18"
+      ],
+      "default": "转换为 %Y-%m-%d",
+      "estimated_changes": 1,
+      "level": "column",
+      "options": [
+        "转换为 %Y-%m-%d",
+        "跳过打标"
+      ],
+      "question_id": "q_date_日期",
+      "rule_id": "date_format",
+      "sample_columns": [
+        "日期"
+      ],
+      "samples_count": 1
+    },
+    {
+      "affected_row_keys": [
+        "2024-03-15"
+      ],
+      "default": "标记跳过",
+      "estimated_changes": 1,
+      "level": "point",
+      "options": [
+        "标记跳过",
+        "以收盘价为准修正"
+      ],
+      "question_id": "q_ohlc_2024-03-15",
+      "rule_id": "ohlc_contradiction",
+      "sample_columns": [
+        "日期",
+        "最高价",
+        "最低价",
+        "收盘价"
+      ],
+      "samples_count": 1
+    }
+  ],
+  "futures": [
+    {
+      "affected_row_keys": [
+        "IC2406|2024-06-05"
+      ],
+      "default": "保留第一条",
+      "estimated_changes": 1,
+      "level": "strategy",
+      "options": [
+        "保留第一条",
+        "保留最后一条",
+        "跳过打标"
+      ],
+      "question_id": "q_dup_key",
+      "rule_id": "duplicate_key",
+      "sample_columns": [
+        "合约代码",
+        "日期"
+      ],
+      "samples_count": 2
+    },
+    {
+      "affected_row_keys": [
+        "IF2409|2024-06-05"
+      ],
+      "default": "填 NaN",
+      "estimated_changes": 1,
+      "level": "column",
+      "options": [
+        "填 NaN",
+        "跳过打标"
+      ],
+      "question_id": "q_missing_持仓量",
+      "rule_id": "missing_token",
+      "sample_columns": [
+        "合约代码",
+        "日期",
+        "持仓量"
+      ],
+      "samples_count": 1
+    },
+    {
+      "affected_row_keys": [
+        "IF2406|2024/06/04"
+      ],
+      "default": "转换为 %Y-%m-%d",
+      "estimated_changes": 1,
+      "level": "column",
+      "options": [
+        "转换为 %Y-%m-%d",
+        "跳过打标"
+      ],
+      "question_id": "q_date_日期",
+      "rule_id": "date_format",
+      "sample_columns": [
+        "合约代码",
+        "日期"
+      ],
+      "samples_count": 1
+    },
+    {
+      "affected_row_keys": [
+        "IC2406|2024-06-04"
+      ],
+      "default": "按边界裁剪",
+      "estimated_changes": 1,
+      "level": "column",
+      "options": [
+        "按边界裁剪",
+        "跳过打标"
+      ],
+      "question_id": "q_limit_up_down_涨跌幅_%",
+      "rule_id": "limit_up_down",
+      "sample_columns": [
+        "合约代码",
+        "日期",
+        "涨跌幅_%"
+      ],
+      "samples_count": 1
+    },
+    {
+      "affected_row_keys": [
+        "IC2406|2024-06-05"
+      ],
+      "default": "标记跳过",
+      "estimated_changes": 1,
+      "level": "point",
+      "options": [
+        "标记跳过",
+        "以收盘价为准修正"
+      ],
+      "question_id": "q_ohlc_IC2406|2024-06-05",
+      "rule_id": "ohlc_contradiction",
+      "sample_columns": [
+        "合约代码",
+        "日期",
+        "最高价",
+        "最低价",
+        "收盘价"
+      ],
+      "samples_count": 1
+    }
+  ]
+}

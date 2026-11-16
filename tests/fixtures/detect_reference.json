@@ -1,0 +1,159 @@
+{
+  "a_stock_daily": [
+    {
+      "rows": [
+        "2024-03-12"
+      ],
+      "rule_id": "missing_token",
+      "sample_columns": [
+        "收盘价",
+        "日期"
+      ],
+      "targets": [
+        "收盘价"
+      ]
+    },
+    {
+      "rows": [
+        "2024-03-13"
+      ],
+      "rule_id": "missing_token",
+      "sample_columns": [
+        "成交额_元",
+        "日期"
+      ],
+      "targets": [
+        "成交额_元"
+      ]
+    },
+    {
+      "rows": [
+        "2024-03-14"
+      ],
+      "rule_id": "duplicate_key",
+      "sample_columns": [
+        "日期"
+      ],
+      "targets": [
+        "日期"
+      ]
+    },
+    {
+      "rows": [
+        "2024-03-15"
+      ],
+      "rule_id": "ohlc_contradiction",
+      "sample_columns": [
+        "收盘价",
+        "日期",
+        "最低价",
+        "最高价"
+      ],
+      "targets": [
+        "收盘价",
+        "最低价",
+        "最高价"
+      ]
+    },
+    {
+      "rows": [
+        "2024-03-19"
+      ],
+      "rule_id": "unit_ambiguity",
+      "sample_columns": [
+        "成交额_元",
+        "日期"
+      ],
+      "targets": [
+        "成交额_元"
+      ]
+    },
+    {
+      "rows": [
+        "2024/03/18"
+      ],
+      "rule_id": "date_format",
+      "sample_columns": [
+        "日期"
+      ],
+      "targets": [
+        "日期"
+      ]
+    }
+  ],
+  "futures": [
+    {
+      "rows": [
+        "IF2409|2024-06-05"
+      ],
+      "rule_id": "missing_token",
+      "sample_columns": [
+        "合约代码",
+        "持仓量",
+        "日期"
+      ],
+      "targets": [
+        "持仓量"
+      ]
+    },
+    {
+      "rows": [
+        "IC2406|2024-06-05"
+      ],
+      "rule_id": "duplicate_key",
+      "sample_columns": [
+        "合约代码",
+        "日期"
+      ],
+      "targets": [
+        "合约代码",
+        "日期"
+      ]
+    },
+    {
+      "rows": [
+        "IC2406|2024-06-05"
+      ],
+      "rule_id": "ohlc_contradiction",
+      "sample_columns": [
+        "合约代码",
+        "收盘价",
+        "日期",
+        "最低价",
+        "最高价"
+      ],
+      "targets": [
+        "收盘价",
+        "最低价",
+        "最高价"
+      ]
+    },
+    {
+      "rows": [
+        "IF2406|2024/06/04"
+      ],
+      "rule_id": "date_format",
+      "sample_columns": [
+        "合约代码",
+        "日期"
+      ],
+      "targets": [
+        "日期"
+      ]
+    },
+    {
+      "rows": [
+        "IC2406|2024-06-04"
+      ],
+      "rule_id": "limit_up_down",
+      "sample_columns": [
+        "合约代码",
+        "日期",
+        "涨跌幅_%"
+      ],
+      "targets": [
+        "涨跌幅_%"
+      ]
+    }
+  ]
+}

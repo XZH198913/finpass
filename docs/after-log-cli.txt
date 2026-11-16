@@ -1,0 +1,24 @@
+# 日志层后：默认路径的终端原样输出（2026-11-05）
+#
+# 命令（`finpass` 未安装为 console script，用等价入口 + PYTHONPATH）：
+#   $env:PYTHONPATH='src'; python -m finpass run examples/pingan_bank_daily_dirty.csv --out out/after-log
+#
+# 与 docs/baseline-4b-cli.txt 同一条命令、同一输入，只有日志层不同
+# （含两处可读性修正：首行写清「问题数 / 规则数」两套口径、[summary] 改 [汇总]）。
+# 未带 --interactive / --auto-only / --questions / --dry-run。
+# 本文件从下一行起是终端原始输出，未截断、未美化。
+
+问题 6 个 | 命中 5 条规则：date_format, duplicate_key, missing_token, ohlc_contradiction, unit_ambiguity
+[汇总] 检查 5 条规则 / 触发 5 条 / 未动 0 条 / 未答 0 条
+[去重]     主键「日期」发现 1 行重复 → 打标保留，原因：默认路径：无人工决策
+[缺失填充] 「收盘价、成交额_元」2 行含占位符「--」「暂无」 → 填充为 NaN
+[单位换算] 「成交额_元」1 行发现单位歧义（含异常量级） → 打标保留，原因：默认路径：无人工决策
+[日期归一] 「日期」1 行含格式不符的值（如「2024/03/18」） → 转换为 datetime64[ns]，格式 %Y-%m-%d
+[矛盾打标] 「最高价、最低价、收盘价」1 行矛盾 → 打标保留，原因：默认路径：无人工决策
+详细决策见 events.jsonl（按 rule_id 可直接检索原事件）
+改动 3
+flag 3
+未问 0（来源：（无））
+产物：out\after-log | 退出码 2
+
+# 进程退出码（harness 记录）：2

@@ -1,0 +1,36 @@
+{
+  "note": "会话产物指纹基线：重构/迁移后必须逐字节一致；随机字段已规范化。",
+  "profile": "a_stock_daily",
+  "input": "examples/pingan_bank_daily_dirty.csv",
+  "decisions": {
+    "missing_token": [
+      "answer",
+      {}
+    ],
+    "duplicate_key": [
+      "answer",
+      {}
+    ],
+    "date_format": [
+      "answer",
+      {}
+    ],
+    "unit_ambiguity": [
+      "batch_apply",
+      {}
+    ],
+    "ohlc_contradiction": [
+      "skip",
+      {}
+    ]
+  },
+  "artifacts": {
+    "clean.csv": "e8ab74d7cf49bce0363c4105473b89a9be65454628f0387f8d678e2acab39bc5",
+    "changes.parquet": "d96dad00d675411554205c364916c9aeecfaf54b8323d311cfc4a8b1bebea086",
+    "events.jsonl": "1ad7395cd36a2d1701c896846bb9cd58eae6f42a4be583251221da432c79335d",
+    "passport.json": "aee5500646dd920188fa68b3c2699dc53750a4de3e846183c5235d3aa5885b4d",
+    "report.before.json": "58bce6906a1b4222a3df6c2e03da19185b5cae2385253c9d3984492b2c68cd8f",
+    "report.after.json": "82bc55579d1684d360a2ca5bbc5ef6ad7aac82f290cbe344da52daea3f5b7bb8",
+    "diff.html": "937e7976fb50c42deec716ce05f7f877f5aa1e5c8feeb388fee8e70a62bbf785"
+  }
+}

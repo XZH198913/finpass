@@ -1,0 +1,36 @@
+{
+  "note": "会话产物指纹基线：重构/迁移后必须逐字节一致；随机字段已规范化。",
+  "profile": "futures",
+  "input": "examples/futures_daily.csv",
+  "decisions": {
+    "missing_token": [
+      "answer",
+      {}
+    ],
+    "duplicate_key": [
+      "answer",
+      {}
+    ],
+    "date_format": [
+      "answer",
+      {}
+    ],
+    "limit_up_down": [
+      "batch_apply",
+      {}
+    ],
+    "ohlc_contradiction": [
+      "skip",
+      {}
+    ]
+  },
+  "artifacts": {
+    "clean.csv": "68465b5a1360366c39747eeadf3acda98f889ae1e3e1387f6e93d9060885207e",
+    "changes.parquet": "357ab61f6e9d0355722870a1a0c9f8123d8dd68e2986637c26e024eed81f6f1d",
+    "events.jsonl": "f637dde3a348afec384e8c60a8027f9e28cbf81f42017a8d6ddc6712965c5c22",
+    "passport.json": "7d9ca837b364ad029ab1fc50a0a9c3e5b6bb19e5466f048a6bf455e7a8fa47ac",
+    "report.before.json": "39dfec6a76700f59c941f266583fa78b2eff8ef3372caeae2c549af3415c385c",
+    "report.after.json": "86b520172e020be85d8a9bca1f4fc1d1ec477ef007ff69589f76412fd14ce718",
+    "diff.html": "c52a41cce8c76fdca730bad865f15d82530aa16e64e0e0ce2202c5a3381467fd"
+  }
+}

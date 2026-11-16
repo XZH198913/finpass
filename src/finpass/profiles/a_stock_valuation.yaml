@@ -1,0 +1,53 @@
+# A 股估值指标 profile（横截面宽表：每行一只股票、无日期列）
+#
+# 与 a_stock_daily 的形态差异全部落在本文件里，engine.py 不需要认识任何估值词：
+#   - 主键只有「证券代码」，没有日期列（时间藏在原表头的 [交易日期] 元数据里，
+#     已在 scripts/prepare_valuation_data.py 归一进列名，例如 pe_ttm_3m 的 3m）；
+#   - 指标列七十余个，只有 3 列进入本次审计范围（见 missing_token.columns）；
+#   - 没有 OHLC、没有单位后缀、市值单位已是元，所以不声明 ohlc_contradiction /
+#     date_format / unit_scale —— 声明了也只会空转。
+#
+# 边界：本 profile 只做「审计级预处理」（缺失、范围、主键唯一），
+# 不判断 PE 负值该不该修、PB 高是不是高估——那是分析，不是清洗。
+
+name: a_stock_valuation
+version: "0.1.0"
+
+target_state:
+  证券代码:
+    semantic: symbol
+    role: key
+  pe_ttm_3m:
+    semantic: ratio
+    # 边界属于「这一列应该长什么样」，不写在规则里（engine 只读 target_state[列].range）。
+    # 负值是亏损股的真值（本文件 1635 行），所以下限给到 -10000 而不是 0。
+    range:
+      min: -10000
+      max: 100000
+  pb_mrq_3m:
+    semantic: ratio
+    range:
+      min: -1000
+      max: 10000
+  mktcap_total_3m:
+    semantic: amount
+    unit: CNY
+
+# 缺失占位符：-- 在本文件里多是「该指标不适用」（如亏损股无 PE），不是「漏填」。
+# 填不填由人决定，所以规则保持 mode: human（默认），auto_only 下打标保留。
+missing_tokens: ["--", "-", "暂无", "N/A"]
+
+policy:
+  duplicate_keep: first
+
+business_rules:
+  # 扫描范围显式点名：宽表不点名 = 每列一题（4d 的形态原语，见 engine 模块 docstring）
+  - id: missing_token
+    columns: [pe_ttm_3m, pb_mrq_3m, mktcap_total_3m]
+  - duplicate_key
+  - id: pe_range
+    type: range_check
+    columns: [pe_ttm_3m]
+  - id: pb_range
+    type: range_check
+    columns: [pb_mrq_3m]

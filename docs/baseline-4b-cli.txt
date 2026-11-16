@@ -1,0 +1,26 @@
+# 4c 前基线：默认路径的终端原样输出（2026-11-05）
+#
+# 命令（`finpass` 未安装为 console script，用等价入口 + PYTHONPATH）：
+#   $env:PYTHONPATH='src'; python -m finpass run examples/pingan_bank_daily_dirty.csv --out out/baseline-4b
+#
+# 与下列命令等价（装好后可直接用）：
+#   finpass run examples/pingan_bank_daily_dirty.csv --out out/baseline-4b
+#
+# 未带 --interactive / --auto-only / --questions / --dry-run。
+# 本文件从下一行起是终端原始输出，未截断、未美化。
+
+问题 6 个 | 规则 date_format, duplicate_key, missing_token, ohlc_contradiction, unit_ambiguity
+[summary] 检查 5 条规则 / 触发 5 条 / 未动 0 条 / 未答 0 条
+[duplicate_key] event_id=12a199cf92f341489af2651ef9e7e9a8 影响 1 行 决策=flag
+[missing_token] event_id=24c1a0d55ab447f69a44b656b1e27e89 影响 1 行 决策=fix
+[missing_token] event_id=ae73ae4a98c9490b93f1eb60ba49e354 影响 1 行 决策=fix
+[unit_ambiguity] event_id=82926e4a144b4483b3aae2fffdc3fa76 影响 1 行 决策=flag
+[date_format] event_id=d3c16319e22c441a85b2331f2e42a4db 影响 1 行 决策=fix
+[ohlc_contradiction] event_id=fe5da62fc29c49a2baf090b4b0db522b 影响 1 行 决策=flag
+改动 3
+flag 3
+未问 0（来源：（无））
+
+产物：out\baseline-4b | 退出码 2
+
+# 进程退出码（harness 记录）：2

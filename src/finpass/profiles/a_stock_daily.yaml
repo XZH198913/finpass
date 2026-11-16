@@ -1,0 +1,84 @@
+# A 股日频 profile（schema 2.2.0：target_state + policy，角色在 target_state[*].role）
+# 只声明域知识（主键 / 列目标态与角色 / 词表 / 单位 / 规则参数），规则实现留在会话层。
+# 会话层不出现「收盘价」「涨跌停」这类词：新增一个域＝新增一个 yaml。
+
+name: a_stock_daily
+version: "0.1.0"
+
+date_column: "日期"
+
+# 列级目标态：这一列应该长什么样。semantic 必填，role 只在跨列规则需要时声明。
+target_state:
+  "日期":
+    semantic: date
+    dtype: "datetime64[ns]"
+    order: asc
+    role: key            # 主键列（schema 2.3.0：顶层 key: 段已删除）
+    format: "%Y-%m-%d"   # date_format 规则的解析/写出格式（检测、修复、选项文案同源）
+  "开盘价":
+    semantic: price
+    dtype: float64
+  "最高价":
+    semantic: price
+    dtype: float64
+    role: high          # schema 2.2.0：跨列规则靠 role 定位，不靠列名也不靠列序
+  "最低价":
+    semantic: price
+    dtype: float64
+    role: low
+  "收盘价":
+    semantic: price
+    dtype: float64
+    role: close
+  "成交量_股":
+    semantic: volume
+    dtype: float64
+    unit: 股
+  "成交额_元":
+    semantic: amount
+    dtype: float64
+    unit: CNY
+    thousands_sep: true
+    # 单位换算与量级跳变判定：代码里不再有 0.0001 / 1000 这类兜底常量
+    unit_scale:
+      factor: 0.0001    # 异常行按「万元 → 元」折算
+      from: 万元
+      spread: 1000      # 极差超过 1000 倍视为单位混用
+
+# 行级决策范式（跨行跨列、单一列承载不了的约定）；缺键会在 open 阶段被明确拒绝
+policy:
+  duplicate_keep: first      # 主键重复时保留第一条；逐题可用 duplicate_keep: last 覆盖
+  default_row_action: answer # ohlc 逐行决策（rows）未覆盖的行缺省修正
+
+# 跨列例外：列级目标态表达不了的约束（上限 3 条）
+cross_column_rules:
+  - id: ohlc_consistency
+    involves: ["最高价", "最低价", "收盘价"]
+
+# 不写 synonyms：schema 保留该键但当前未接线（加载器不消费，不会据此改列名）。
+# 列名必须与本文件 target_state 的键逐字一致；改列名交给数据准备脚本，不交给 profile。
+
+missing_tokens: ["--", "暂无", "N/A"]
+
+units:
+  "成交量_股": "股"
+  "成交额_元": "元"
+
+business_rules:
+  # mode: auto 表示「无人工决策也能执行」，默认路径与降级通道只自动跑这些规则
+  - id: missing_token
+    mode: auto
+  - duplicate_key
+  - ohlc_contradiction
+  # 单位量级跳变只在金额列上有意义，故在这里点名列，代码里不写「额」字
+  # 阈值在 target_state["成交额_元"].unit_scale.spread，规则声明只留「查哪几列」
+  - id: unit_ambiguity
+    type: unit_scale
+    columns: ["成交额_元"]
+  - id: date_format
+    mode: auto
+
+calendar:
+  market: CN
+  timezone: Asia/Shanghai
+  trade_days: weekdays

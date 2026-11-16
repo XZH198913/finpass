@@ -1,0 +1,220 @@
+{
+  "a_stock_daily": [
+    {
+      "action": "answer",
+      "changes": [
+        {
+          "after": null,
+          "before": "{\"日期\": \"2024-03-14\", \"开盘价\": 10.3, \"最高价\": 10.6, \"最低价\": 10.2, \"收盘价\": \"10.3\", \"成交量_股\": 1250000, \"成交额_元\": \"1400\"}",
+          "change_type": "dropped_row",
+          "col": "__row__",
+          "row_key": "2024-03-14"
+        }
+      ],
+      "params": {},
+      "question_id": "q_dup_key",
+      "rule_id": "duplicate_key"
+    },
+    {
+      "action": "answer",
+      "changes": [
+        {
+          "after": null,
+          "before": "--",
+          "change_type": "filled_nan",
+          "col": "收盘价",
+          "row_key": "2024-03-12"
+        }
+      ],
+      "params": {},
+      "question_id": "q_missing_收盘价",
+      "rule_id": "missing_token"
+    },
+    {
+      "action": "answer",
+      "changes": [
+        {
+          "after": null,
+          "before": "暂无",
+          "change_type": "filled_nan",
+          "col": "成交额_元",
+          "row_key": "2024-03-13"
+        }
+      ],
+      "params": {},
+      "question_id": "q_missing_成交额_元",
+      "rule_id": "missing_token"
+    },
+    {
+      "action": "batch_apply",
+      "changes": [
+        {
+          "after": "1200.0",
+          "before": "12000000.0",
+          "change_type": "normalized",
+          "col": "成交额_元",
+          "row_key": "2024-03-19"
+        }
+      ],
+      "params": {},
+      "question_id": "q_unit_成交额_元",
+      "rule_id": "unit_ambiguity"
+    },
+    {
+      "action": "answer",
+      "changes": [
+        {
+          "after": "2024-03-18",
+          "before": "2024/03/18",
+          "change_type": "normalized",
+          "col": "日期",
+          "row_key": "2024/03/18"
+        }
+      ],
+      "params": {},
+      "question_id": "q_date_日期",
+      "rule_id": "date_format"
+    },
+    {
+      "action": "skip",
+      "changes": [
+        {
+          "after": null,
+          "before": null,
+          "change_type": "flagged_kept",
+          "col": "日期",
+          "row_key": "2024-03-15"
+        },
+        {
+          "after": null,
+          "before": null,
+          "change_type": "flagged_kept",
+          "col": "最高价",
+          "row_key": "2024-03-15"
+        },
+        {
+          "after": null,
+          "before": null,
+          "change_type": "flagged_kept",
+          "col": "最低价",
+          "row_key": "2024-03-15"
+        },
+        {
+          "after": null,
+          "before": null,
+          "change_type": "flagged_kept",
+          "col": "收盘价",
+          "row_key": "2024-03-15"
+        }
+      ],
+      "params": {},
+      "question_id": "q_ohlc_2024-03-15",
+      "rule_id": "ohlc_contradiction"
+    }
+  ],
+  "futures": [
+    {
+      "action": "answer",
+      "changes": [
+        {
+          "after": null,
+          "before": "{\"合约代码\": \"IC2406\", \"日期\": \"2024-06-05\", \"开盘价\": 5825, \"最高价\": 5840, \"最低价\": 5810, \"收盘价\": 5835, \"成交量_手\": 9400, \"持仓量\": \"28600\", \"涨跌幅_%\": 0.3}",
+          "change_type": "dropped_row",
+          "col": "__row__",
+          "row_key": "IC2406|2024-06-05"
+        }
+      ],
+      "params": {},
+      "question_id": "q_dup_key",
+      "rule_id": "duplicate_key"
+    },
+    {
+      "action": "answer",
+      "changes": [
+        {
+          "after": null,
+          "before": "暂无",
+          "change_type": "filled_nan",
+          "col": "持仓量",
+          "row_key": "IF2409|2024-06-05"
+        }
+      ],
+      "params": {},
+      "question_id": "q_missing_持仓量",
+      "rule_id": "missing_token"
+    },
+    {
+      "action": "answer",
+      "changes": [
+        {
+          "after": "2024-06-04",
+          "before": "2024/06/04",
+          "change_type": "normalized",
+          "col": "日期",
+          "row_key": "IF2406|2024/06/04"
+        }
+      ],
+      "params": {},
+      "question_id": "q_date_日期",
+      "rule_id": "date_format"
+    },
+    {
+      "action": "batch_apply",
+      "changes": [
+        {
+          "after": "10.0",
+          "before": "12.5",
+          "change_type": "changed_value",
+          "col": "涨跌幅_%",
+          "row_key": "IC2406|2024-06-04"
+        }
+      ],
+      "params": {},
+      "question_id": "q_limit_up_down_涨跌幅_%",
+      "rule_id": "limit_up_down"
+    },
+    {
+      "action": "skip",
+      "changes": [
+        {
+          "after": null,
+          "before": null,
+          "change_type": "flagged_kept",
+          "col": "合约代码",
+          "row_key": "IC2406|2024-06-05"
+        },
+        {
+          "after": null,
+          "before": null,
+          "change_type": "flagged_kept",
+          "col": "日期",
+          "row_key": "IC2406|2024-06-05"
+        },
+        {
+          "after": null,
+          "before": null,
+          "change_type": "flagged_kept",
+          "col": "最高价",
+          "row_key": "IC2406|2024-06-05"
+        },
+        {
+          "after": null,
+          "before": null,
+          "change_type": "flagged_kept",
+          "col": "最低价",
+          "row_key": "IC2406|2024-06-05"
+        },
+        {
+          "after": null,
+          "before": null,
+          "change_type": "flagged_kept",
+          "col": "收盘价",
+          "row_key": "IC2406|2024-06-05"
+        }
+      ],
+      "params": {},
+      "question_id": "q_ohlc_IC2406|2024-06-05",
+      "rule_id": "ohlc_contradiction"
+    }
+  ]
+}

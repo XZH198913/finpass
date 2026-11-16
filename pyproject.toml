@@ -1,0 +1,79 @@
+[build-system]
+# 77 是 PEP 639（license 用 SPDX 字符串 + license-files）落地的最低版本；
+# 低于它的 setuptools 只认 license = {text = "..."} 的旧写法。
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finpass"
+# 版本号只有一处事实源：src/finpass/__init__.py 的 __version__。
+# 之前这里也写一份 0.0.1，两处手改必然漂——`finpass --version` 报的可能是包版本也可能是代码版本。
+dynamic = ["version"]
+description = "Finance data cleaning CLI with audit passport: traceable decisions, not guaranteed answers."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+keywords = [
+    "data-quality",
+    "data-cleaning",
+    "audit",
+    "reproducibility",
+    "csv",
+    "finance-data",
+    "passport",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "pandas",
+    "pyarrow",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyterlab",
+    "pytest",
+    # 发布链：python -m build / python -m twine check，见 docs/publish.md
+    "build",
+    "twine",
+]
+
+[project.scripts]
+finpass = "finpass.cli:main"
+
+# PyPI 侧栏的四个链接。前提：仓库已推送到 main 分支——
+# 链接指向不存在的仓库时，PyPI 页面上是四个坏链，比留空更糟。
+[project.urls]
+Homepage = "https://github.com/XZH198913/finpass"
+Repository = "https://github.com/XZH198913/finpass"
+Issues = "https://github.com/XZH198913/finpass/issues"
+Changelog = "https://github.com/XZH198913/finpass/blob/main/CHANGELOG.md"
+
+[tool.setuptools.dynamic]
+version = { attr = "finpass.__version__" }
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+finpass = ["profiles/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
