@@ -17,7 +17,7 @@ and kept (`flagged_kept`) rather than silently rewritten.
 
 > Traceable decisions, not guaranteed answers.
 
-**Status: `0.0.1`, alpha, TestPyPI only.** Interfaces and output formats may still change. Not
+**Status: `0.0.2`, alpha, TestPyPI only.** Interfaces and output formats may still change. Not
 recommended for decisions that need to be defensible in production yet.
 
 ### What it is good at
@@ -34,8 +34,13 @@ recommended for decisions that need to be defensible in production yet.
 ## Install
 
 ```bash
-pip install -i https://test.pypi.org/simple/ finpass==0.0.1
+pip install --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple \
+            finpass==0.0.2
 ```
+
+`--extra-index-url` is required: TestPyPI only hosts FinPass itself, while its dependencies
+(`pandas`, `pyarrow`, `pyyaml`) come from PyPI. Without it, install fails to resolve them.
 
 Requires Python 3.10 or newer. From a source checkout: `pip install -e ".[dev]"`.
 If `finpass` is not on your `PATH` (common with Windows `Scripts` directories), `python -m finpass`

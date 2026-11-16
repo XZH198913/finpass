@@ -8,12 +8,18 @@ such changes are called out explicitly.
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-11-16
+
+Documentation and packaging only; no behaviour change.
+
 ### Changed
 
 - `README.md` rewritten in English for readers evaluating the tool: positioning, fit, quickstart,
   outputs, exit codes, input requirements, limitations, comparison. Implementation details and
   refactor invariants moved to `docs/internals.md` without rewording the facts.
 - Added `SECURITY.md` (security model, supported versions, private reporting) and this file.
+- `pyproject.toml` gains `[project.urls]` (Homepage, Repository, Issues, Changelog).
+- `.gitignore` covers `.pytest_cache/`, `.ruff_cache/`, `.coverage`, and the local tool workspace.
 
 ## [0.0.1] - 2026-11-16
 
