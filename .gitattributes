@@ -1,0 +1,11 @@
+# 行尾统一：仓库内一律 LF，检出时按平台自动处理。
+# 没有这个文件时，Windows 上每次提交都会刷一遍 "LF will be replaced by CRLF"。
+* text=auto eol=lf
+
+# 二进制：不要做行尾/文本转换，也不要当文本 diff。
+*.parquet binary
+*.whl binary
+*.tar.gz binary
+*.png binary
+*.jpg binary
+*.pdf binary
