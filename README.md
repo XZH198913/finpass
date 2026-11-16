@@ -2,7 +2,7 @@
 
 ![status: alpha](https://img.shields.io/badge/status-alpha-orange)
 ![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
-![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)
+[![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/XZH198913/finpass/blob/main/LICENSE)
 
 **Clean a messy financial CSV into a dataset you can hand off, and leave behind a record that proves what changed.**
 
@@ -165,14 +165,18 @@ Positions are as documented by each project as of November 2026.
 
 ## Documentation
 
-- `docs/internals.md` — architecture, rule coverage matrix, and the invariants each refactor must keep
-- `docs/spec-stage*-追认.md` — design decisions and trade-offs, stage by stage (Chinese)
-- `docs/publish.md` — release runbook
-- `CHANGELOG.md` — version history; `SECURITY.md` — security model and how to report a vulnerability
-- `notebooks/00_quickstart.ipynb` — end-to-end walkthrough; `01_minimal_kernel.ipynb` — a self-contained kernel
+- [`docs/internals.md`](https://github.com/XZH198913/finpass/blob/main/docs/internals.md) —
+  architecture, rule coverage matrix, and the invariants each refactor must keep
+- [`docs/`](https://github.com/XZH198913/finpass/tree/main/docs) — design decisions and trade-offs,
+  stage by stage (Chinese), plus the release runbook
+- [`CHANGELOG.md`](https://github.com/XZH198913/finpass/blob/main/CHANGELOG.md) — version history
+- [`SECURITY.md`](https://github.com/XZH198913/finpass/blob/main/SECURITY.md) — security model and
+  how to report a vulnerability
+- [`notebooks/`](https://github.com/XZH198913/finpass/tree/main/notebooks) — end-to-end walkthrough
+  and a self-contained kernel
 
 ## License
 
-Apache-2.0; see `LICENSE`. Chosen over MIT because FinPass is about auditable cleaning, and
-commercial adopters care about patent risk: Apache-2.0 section 3 grants an explicit patent license
-with a retaliation clause, which MIT does not.
+Apache-2.0; see [`LICENSE`](https://github.com/XZH198913/finpass/blob/main/LICENSE). Chosen over MIT
+because FinPass is about auditable cleaning, and commercial adopters care about patent risk:
+Apache-2.0 section 3 grants an explicit patent license with a retaliation clause, which MIT does not.
