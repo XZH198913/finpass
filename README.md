@@ -17,7 +17,7 @@ and kept (`flagged_kept`) rather than silently rewritten.
 
 > Traceable decisions, not guaranteed answers.
 
-**Status: `0.0.2`, alpha, TestPyPI only.** Interfaces and output formats may still change. Not
+**Status: `0.0.3`, alpha.** Interfaces and output formats may still change. Not
 recommended for decisions that need to be defensible in production yet.
 
 ### What it is good at
@@ -34,13 +34,11 @@ recommended for decisions that need to be defensible in production yet.
 ## Install
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple \
-            finpass==0.0.2
+pip install finpass==0.0.3
 ```
 
-`--extra-index-url` is required: TestPyPI only hosts FinPass itself, while its dependencies
-(`pandas`, `pyarrow`, `pyyaml`) come from PyPI. Without it, install fails to resolve them.
+Earlier `0.0.1` / `0.0.2` were TestPyPI-only; `0.0.3` is published on PyPI, so no extra index is
+needed (`pandas`, `pyarrow`, and `pyyaml` resolve normally).
 
 Requires Python 3.10 or newer. From a source checkout: `pip install -e ".[dev]"`.
 If `finpass` is not on your `PATH` (common with Windows `Scripts` directories), `python -m finpass`
@@ -59,20 +57,43 @@ finpass verify out/quickstart/pingan_bank_daily_dirty.passport.json
 `--auto-only` means "do not ask me anything", so the three undecidable items stay flagged:
 
 ```text
-问题 6 个 | 命中 5 条规则：date_format, duplicate_key, missing_token, ohlc_contradiction, unit_ambiguity
-[汇总] 检查 5 条规则 / 触发 5 条 / 未动 0 条 / 未答 0 条
-[去重]     主键「日期」发现 1 行重复 → 打标保留，原因：auto_only：无人工决策
-[缺失填充] 「收盘价、成交额_元」2 行含占位符「--」「暂无」 → 填充为 NaN
-[单位换算] 「成交额_元」1 行发现单位歧义（含异常量级） → 打标保留，原因：auto_only：无人工决策
-[日期归一] 「日期」1 行含格式不符的值（如「2024/03/18」） → 转换为 datetime64[ns]，格式 %Y-%m-%d
-[矛盾打标] 「最高价、最低价、收盘价」1 行矛盾 → 打标保留，原因：auto_only：无人工决策
-详细决策见 events.jsonl（按 rule_id 可直接检索原事件）
-改动 3 / flag 3 / 未问 0
-产物：out/quickstart | 退出码 2
+Questions 6 | 5 rules matched: date_format, duplicate_key, missing_token, ohlc_contradiction, unit_ambiguity
+[Summary] 5 rules checked / 5 matched / 0 idle / 0 unanswered
+[dedupe] key "日期": duplicates found (1 row involved) → flagged and kept, reason: auto_only: no human decision
+[fill]   "收盘价, 成交额_元" 2 rows with placeholders '--' or '暂无' → filled with NaN
+[unit]   "成交额_元" 1 row with ambiguous units (contains an unexpected magnitude) → flagged and kept, reason: auto_only: no human decision
+[date]   "日期" 1 row with non-conforming values (e.g. 2024/03/18) → converted to datetime64[ns], format %Y-%m-%d
+[ohlc]   "最高价, 最低价, 收盘价" 1 row with contradictions → flagged and kept, reason: auto_only: no human decision
+full decisions: events.jsonl (search by rule_id)
+fixed 3
+flagged 3
+unanswered 0 (sources: (none))
+outputs: out\quickstart | exit code 2
 ```
 
-> Terminal messages are currently Chinese. An English message catalog is on the roadmap; the
-> machine-readable outputs (`events.jsonl`, `changes.parquet`, `passport.json`) are language-neutral.
+Column names and values in quotes (`日期`, `--`, …) come from your CSV and profiles; they are user
+data and are never translated. See [`docs/after-log-cli.en.txt`](docs/after-log-cli.en.txt) for a full
+default-path transcript (and `docs/after-log-cli.txt` for the Chinese baseline).
+
+### Language
+
+Terminal messages are available in English (default) and Chinese. Two switches select the language:
+
+```bash
+FINPASS_LANG=zh finpass run examples/pingan_bank_daily_dirty.csv --out out/zh
+finpass --lang zh run examples/pingan_bank_daily_dirty.csv --out out/zh
+```
+
+`--lang {en,zh}` takes precedence over `FINPASS_LANG`, which in turn falls back to `en`. The
+environment variable also accepts `zh-cn`, `zh_cn`, `cn`, and `chinese` (and `en-us`, `english`).
+`--lang` works before or after the subcommand, and applies to `--help` and error messages too.
+When `--lang` is used explicitly, the passport's `cli_replay_cmd` records it so the run can be
+reproduced in the same language.
+
+Only human-facing text changes: terminal output, question cards, options, reasons, and the
+`diff.html` legend. Machine-readable outputs (`events.jsonl`, `changes.parquet`, `passport.json`)
+keep the same field names, enum values, and row keys in both languages. Internal contract errors
+from the engine and profile loader stay in their original wording.
 
 ### Outputs
 
@@ -93,7 +114,7 @@ Seven files land in `--out`:
 hash OK
 replay OK
 events OK
-verify 通过（存在未解决项，退出码 2）
+verify passed (unresolved items remain, exit code 2)
 ```
 
 Three independent checks: the SHA-256 of `clean.csv` matches the passport; replaying `changes`
@@ -123,8 +144,8 @@ finpass resume q.yaml --out out/quickstart
 Exit code `1` is written for people who do not read tracebacks — for example:
 
 ```text
-[失败] 找不到文件：nope.csv
-       检查路径；相对路径按「当前目录」解析，先 `pwd` 看一眼你在哪。
+[error] file not found: nope.csv
+        Check the path; relative paths resolve against the current directory (`pwd`).
 ```
 
 Set `FINPASS_DEBUG=1` to see the original stack trace when reporting a bug.

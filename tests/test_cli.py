@@ -163,6 +163,47 @@ def test_help_lists_three_subcommands() -> None:
         assert command in result.stdout
 
 
+def test_lang_switch_selects_help_language() -> None:
+    """--lang 优先于 FINPASS_LANG（conftest 钉成 zh），且 --help 自身也跟着变。"""
+    zh = _cli("--lang", "zh", "--help")
+    en = _cli("--lang=en", "--help")
+
+    assert zh.returncode == en.returncode == 0
+    assert "承诺决策可追溯" in zh.stdout
+    assert "Decisions are traceable" in en.stdout
+    assert "--lang" in en.stdout
+
+
+def test_lang_switch_applies_to_run_and_replay_command(tmp_path: Path) -> None:
+    out = tmp_path / "lang_zh"
+    zh = _cli("--lang", "zh", "run", str(DIRTY_CSV), "--out", str(out))
+    assert zh.returncode == 2, zh.stderr
+    assert "[汇总]" in zh.stdout
+
+    passport_path = out / f"{DIRTY_CSV.stem}.passport.json"
+    passport = _passport(passport_path)
+    assert "--lang zh" in passport["cli_replay_cmd"]
+
+    # 子命令后写法同样生效；verify 的提示也按所选语言输出
+    en = _cli("run", "--lang=en", str(DIRTY_CSV), "--out", str(tmp_path / "lang_en"))
+    assert en.returncode == 2, en.stderr
+    assert "[Summary]" in en.stdout
+    verified = _cli("--lang", "en", "verify", str(passport_path))
+    assert "verify passed" in verified.stdout
+
+
+def test_finpass_lang_env_and_flag_precedence() -> None:
+    env_zh = _cli("--help", env_extra={"FINPASS_LANG": "zh"})
+    env_en = _cli("--help", env_extra={"FINPASS_LANG": "en"})
+    assert "承诺决策可追溯" in env_zh.stdout
+    assert "Decisions are traceable" in env_en.stdout
+
+    # --lang 覆盖环境变量：中文环境下仍输出英文 help
+    flag_wins = _cli("--lang", "en", "--help", env_extra={"FINPASS_LANG": "zh"})
+    assert "Decisions are traceable" in flag_wins.stdout
+    assert "承诺决策可追溯" not in flag_wins.stdout
+
+
 # ---------------------------------------------------------------- 失败路径的表述
 #
 # 判据只有一条：**不懂代码的人看完这句就知道该改什么**。所以每个用例都同时钉住

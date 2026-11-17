@@ -22,8 +22,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from finpass import messages
 from finpass.narrate import LABELS, TRACE_LINE
 from finpass.profile import load_profile
+
+#: 日志层的标签与末行提示按语言分表；断言跟着**当前语言**走（conftest 钉成 zh）。
+LANG = messages.language()
+TRACE = TRACE_LINE[LANG]
 
 REPO = Path(__file__).resolve().parents[1]
 DIRTY_CSV = REPO / "examples" / "pingan_bank_daily_dirty.csv"
@@ -69,14 +74,14 @@ def _log_lines(stdout: list[str]) -> list[str]:
     return [
         line
         for line in stdout
-        if line.startswith("[") and not line.startswith("[汇总]") and line != TRACE_LINE
+        if line.startswith("[") and not line.startswith("[汇总]") and line != TRACE
     ]
 
 
 def _label_of(rule_id: str) -> str:
     """``rule_id`` → 方括号标签：先查 profile 的 type，再查模板表，最后退回 id 本身。"""
     types = {spec.id: spec.type for spec in PROFILE.rules}
-    return LABELS.get(types.get(rule_id, rule_id), rule_id)
+    return LABELS[LANG].get(types.get(rule_id, rule_id), rule_id)
 
 
 def test_every_log_line_follows_the_readable_format(tmp_path: Path) -> None:

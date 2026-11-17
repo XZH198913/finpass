@@ -149,6 +149,16 @@ def test_date_option_text_follows_target_state() -> None:
     assert _question(session, "date_format").options[0] == "转换为 %Y/%m/%d"
 
 
+def test_english_date_option_text_follows_target_state(set_lang) -> None:
+    set_lang("en")
+    target = dict(A_STOCK_RAW["target_state"])
+    target["日期"] = {**target["日期"], "format": "%d.%m.%Y"}
+    session = fp.open(DIRTY_CSV, profile=_profile(target_state=target))
+    session.start()
+
+    assert _question(session, "date_format").options[0] == "Convert to %d.%m.%Y"
+
+
 def test_duplicate_keep_override_is_honoured() -> None:
     session = fp.open(DIRTY_CSV)
     session.start()

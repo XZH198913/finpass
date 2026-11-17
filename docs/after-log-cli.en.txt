@@ -1,0 +1,25 @@
+# After the log layer: raw terminal output of the default path in English (2026-11-17)
+#
+# Command (equivalent entry point + PYTHONPATH, as in after-log-cli.txt):
+#   $env:PYTHONPATH='src'; $env:PYTHONIOENCODING='utf-8'
+#   python -m finpass --lang en run examples/pingan_bank_daily_dirty.csv --out out/after-log-en
+#
+# English is also the default without --lang. No --interactive / --auto-only /
+# --questions / --dry-run; the same input and code path as docs/after-log-cli.txt.
+# `out/after-log-en` is English: column names inside quotes come from the CSV/profiles
+# (user data, never translated). From the next line: raw, unedited terminal output.
+
+Questions 6 | 5 rules matched: date_format, duplicate_key, missing_token, ohlc_contradiction, unit_ambiguity
+[Summary] 5 rules checked / 5 matched / 0 idle / 0 unanswered
+[dedupe] key "日期": duplicates found (1 row involved) → flagged and kept, reason: default path: no human decision
+[fill]   "收盘价, 成交额_元" 2 rows with placeholders '--' or '暂无' → filled with NaN
+[unit]   "成交额_元" 1 row with ambiguous units (contains an unexpected magnitude) → flagged and kept, reason: default path: no human decision
+[date]   "日期" 1 row with non-conforming values (e.g. 2024/03/18) → converted to datetime64[ns], format %Y-%m-%d
+[ohlc]   "最高价, 最低价, 收盘价" 1 row with contradictions → flagged and kept, reason: default path: no human decision
+full decisions: events.jsonl (search by rule_id)
+fixed 3
+flagged 3
+unanswered 0 (sources: (none))
+outputs: out\after-log-en | exit code 2
+
+# Process exit code (as recorded by the harness): 2

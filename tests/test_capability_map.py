@@ -1,12 +1,13 @@
-"""判据 1 的落地证据：README 的机制覆盖度表必须能被机械解析，且与 profile 声明一致。
+"""判据 1 的落地证据：docs/internals.md 的覆盖度表必须能被机械解析，且与 profile 声明一致。
 
 解析器契约（任一违反都抛错，不允许跳过）：
 
-- 锚点固定为 ``## 机制覆盖度``；
-- 表头 = ``rule_type | 每个 profile 一列 | 总状态``，中间列必须是真实 profile 名
+- 锚点固定为 ``## Rule coverage``（0.0.2 起表格随文档重构从 README 迁入 internals）；
+- 表头 = ``rule_type | 每个 profile 一列 | Overall``，中间列必须是真实 profile 名
   （**列数随 ``profiles/`` 增减**，夹具按实际数量生成，不写死 3 列）；
-- 格值只允许 ``完整`` / ``部分`` / ``未做`` / ``N/A``；
-- ``总状态`` = 各 profile 格里「非 N/A 中最差者」，全 N/A 时取 ``N/A``；
+- 格值只允许 ``complete`` / ``n/a to profile`` / ``incomplete`` / ``N/A``；
+- ``Overall`` = 各 profile 格的短板聚合：任一 ``n/a to profile``（或 ``incomplete``）即
+  ``incomplete``，全 ``N/A`` 时取 ``N/A``，其余为 ``complete``；
 - 行序不固定，解析后按 ``rule_type`` 聚合，返回 ``dict[str, dict[str, str]]``。
 """
 
@@ -20,11 +21,10 @@ from finpass.engine import RULE_TYPES
 from finpass.profile import PROFILE_DIR, load_profile
 
 ROOT = Path(__file__).resolve().parents[1]
-README = ROOT / "README.md"
-ANCHOR = "## 机制覆盖度"
-TOTAL_COLUMN = "总状态"
-STATUSES = ("完整", "部分", "未做", "N/A")
-WORST_FIRST = ("未做", "部分", "完整")
+INTERNALS = ROOT / "docs" / "internals.md"
+ANCHOR = "## Rule coverage"
+TOTAL_COLUMN = "Overall"
+STATUSES = ("complete", "n/a to profile", "incomplete", "N/A")
 
 
 def profile_names() -> list[str]:
@@ -32,13 +32,14 @@ def profile_names() -> list[str]:
 
 
 def aggregate(statuses: list[str]) -> str:
-    """短板原则：取非 N/A 中最差者；全 N/A 仍是 N/A。"""
+    """短板原则：有未声明的 profile 就是 incomplete；全 N/A 仍是 N/A。"""
     applicable = [status for status in statuses if status != "N/A"]
     if not applicable:
         return "N/A"
-    for level in WORST_FIRST:
-        if level in applicable:
-            return level
+    if any(status in ("n/a to profile", "incomplete") for status in applicable):
+        return "incomplete"
+    if all(status == "complete" for status in applicable):
+        return "complete"
     raise AssertionError(f"无法聚合的状态集合：{statuses}")  # pragma: no cover
 
 
@@ -126,7 +127,7 @@ def _text(header: list[str], rows: list[list[str]]) -> str:
 
 
 def _real_matrix() -> dict[str, dict[str, str]]:
-    return parse_matrix(README.read_text(encoding="utf-8"))
+    return parse_matrix(INTERNALS.read_text(encoding="utf-8"))
 
 
 def test_matrix_covers_every_implemented_rule_type() -> None:
@@ -149,9 +150,9 @@ def test_documented_status_matches_profile_declarations() -> None:
             if declared is None:
                 expected = "N/A"
             elif rule_type in declared:
-                expected = "完整"
+                expected = "complete"
             else:
-                expected = "未做"
+                expected = "n/a to profile"
             assert row[name] == expected, f"{rule_type} @ {name}"
 
 
@@ -159,7 +160,7 @@ def test_unavailable_profile_column_is_all_na() -> None:
     """``fund_nav`` 是占位 profile：整列必须是 ``N/A``，且解析器不因它报错。
 
     口径写死在这里：``N/A`` **只表示「该 profile 不可用」**，不是第四种「实现程度」——
-    ``未做`` 才是「引擎实现了这个 rule_type、但该 profile 没声明」。
+    ``n/a to profile`` 才是「引擎实现了这个 rule_type、但该 profile 没声明」。
     两者混用会让读者分不清「类型没做」和「profile 不能用」。
     """
     matrix = _real_matrix()
@@ -173,7 +174,7 @@ def test_unavailable_profile_column_is_all_na() -> None:
 
 def test_missing_anchor_raises() -> None:
     with pytest.raises(AssertionError, match="缺少锚点"):
-        parse_matrix("| rule_type | a_stock_daily | futures | fund_nav | 总状态 |")
+        parse_matrix("| rule_type | a_stock_daily | futures | fund_nav | Overall |")
 
 
 def _statuses(*values: str) -> list[str]:
@@ -186,19 +187,19 @@ def _statuses(*values: str) -> list[str]:
 def test_unknown_status_value_raises() -> None:
     header = ["rule_type", *profile_names(), TOTAL_COLUMN]
     with pytest.raises(AssertionError, match="非法格值"):
-        parse_matrix(_text(header, [["missing_token", *_statuses("完整", "完整"), "差不多"]]))
+        parse_matrix(_text(header, [["missing_token", *_statuses("complete", "complete"), "invalid"]]))
 
 
 def test_missing_column_raises() -> None:
     header = ["rule_type", profile_names()[0], profile_names()[1], TOTAL_COLUMN]
     with pytest.raises(AssertionError, match="表头必须恰好"):
-        parse_matrix(_text(header, [["missing_token", "完整", "完整", "完整"]]))
+        parse_matrix(_text(header, [["missing_token", "complete", "complete", "complete"]]))
 
 
 def test_row_order_is_not_significant() -> None:
     header = ["rule_type", *profile_names(), TOTAL_COLUMN]
     rows = [
-        ["rule_type_b", *_statuses("完整", "未做"), "未做"],
+        ["rule_type_b", *_statuses("complete", "n/a to profile"), "incomplete"],
         ["rule_type_a", *_statuses(), "N/A"],
     ]
     assert parse_matrix(_text(header, rows)) == parse_matrix(_text(header, list(reversed(rows))))

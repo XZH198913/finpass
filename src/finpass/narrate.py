@@ -26,53 +26,103 @@ from __future__ import annotations
 import unicodedata
 from typing import Any, Iterable, Sequence
 
-#: 规则**类型** → 方括号里的动作标签。
+from . import messages
+
+#: 规则**类型** → 方括号里的动作标签（按语言）。
 #: 键是 ``rule_type`` 而不是 ``rule_id``，这样 ``unit_ambiguity``（type=unit_scale）
 #: 这类自定义 id 也能命中同一份句式；查不到就退回 ``rule_id`` 本身。
-LABELS: dict[str, str] = {
-    "duplicate_key": "去重",
-    "missing_token": "缺失填充",
-    "unit_scale": "单位换算",
-    "date_format": "日期归一",
-    "range_check": "范围校验",
-    "ohlc_contradiction": "矛盾打标",
+LABELS: dict[str, dict[str, str]] = {
+    "en": {
+        "duplicate_key": "dedupe",
+        "missing_token": "fill",
+        "unit_scale": "unit",
+        "date_format": "date",
+        "range_check": "range",
+        "ohlc_contradiction": "ohlc",
+    },
+    "zh": {
+        "duplicate_key": "去重",
+        "missing_token": "缺失填充",
+        "unit_scale": "单位换算",
+        "date_format": "日期归一",
+        "range_check": "范围校验",
+        "ohlc_contradiction": "矛盾打标",
+    },
 }
 
-#: 句式模板：``rule_type`` → 动作 → 句。四要素必须都在句子里：
-#: 动作（方括号标签）、对象（``{cols}`` / ``{keys}``）、依据（「发现 / 含 / 越界 / 矛盾」）、
+#: 句式模板（按语言）：``rule_type`` → 动作 → 句。四要素必须都在句子里：
+#: 动作（方括号标签）、对象（``{cols}`` / ``{keys}``）、依据（found / contains / outside / contradicts）、
 #: 结果（``→`` 之后的半句）。
-NARRATIVE_TEMPLATES: dict[str, dict[str, str]] = {
-    "duplicate_key": {
-        "fix": "主键「{keys}」发现 {n} 行重复 → 保留{keep}，删除 {m} 行",
-        "flag": "主键「{keys}」发现 {n} 行重复 → 打标保留，原因：{reason}",
+NARRATIVE_TEMPLATES: dict[str, dict[str, dict[str, str]]] = {
+    "en": {
+        "duplicate_key": {
+            "fix": 'key "{keys}": duplicates found ({rows} involved) → keep {keep}, drop {dropped}',
+            "flag": 'key "{keys}": duplicates found ({rows} involved) → flagged and kept, '
+            "reason: {reason}",
+        },
+        "missing_token": {
+            "fix": "{cols} {rows} with placeholders {evidence} → filled with {fill}",
+            "flag": "{cols} {rows} with placeholders {evidence} → flagged and kept, "
+            "reason: {reason}",
+        },
+        "unit_scale": {
+            "fix": "{cols} {rows}{evidence} → {conv}",
+            "flag": "{cols} {rows} with ambiguous units{evidence} → flagged and kept, "
+            "reason: {reason}",
+        },
+        "date_format": {
+            "fix": "{cols} {rows} with non-conforming values{evidence} → converted to {conv}",
+            "flag": "{cols} {rows} with non-conforming values{evidence} → flagged and kept, "
+            "reason: {reason}",
+        },
+        "range_check": {
+            "fix": "{cols} {rows} outside{bounds} → clipped to the bounds",
+            "flag": "{cols} {rows} outside{bounds} → flagged and kept, reason: {reason}",
+        },
+        "ohlc_contradiction": {
+            "fix": "{cols} {rows} with contradictions → corrected from the close price",
+            "flag": "{cols} {rows} with contradictions → flagged and kept, reason: {reason}",
+        },
     },
-    "missing_token": {
-        "fix": "{cols}{n} 行含占位符{evidence} → 填充为 {fill}",
-        "flag": "{cols}{n} 行含占位符{evidence} → 打标保留，原因：{reason}",
-    },
-    "unit_scale": {
-        "fix": "{cols}{n} 行{evidence} → {conv}",
-        "flag": "{cols}{n} 行发现单位歧义{evidence} → 打标保留，原因：{reason}",
-    },
-    "date_format": {
-        "fix": "{cols}{n} 行含格式不符的值{evidence} → 转换为 {conv}",
-        "flag": "{cols}{n} 行含格式不符的值{evidence} → 打标保留，原因：{reason}",
-    },
-    "range_check": {
-        "fix": "{cols}{n} 行越界{bounds} → 按边界裁剪",
-        "flag": "{cols}{n} 行越界{bounds} → 打标保留，原因：{reason}",
-    },
-    "ohlc_contradiction": {
-        "fix": "{cols}{n} 行矛盾 → 以收盘价为准修正",
-        "flag": "{cols}{n} 行矛盾 → 打标保留，原因：{reason}",
+    "zh": {
+        "duplicate_key": {
+            "fix": "主键「{keys}」发现 {rows}重复 → 保留{keep}，删除 {dropped}",
+            "flag": "主键「{keys}」发现 {rows}重复 → 打标保留，原因：{reason}",
+        },
+        "missing_token": {
+            "fix": "{cols}{rows}含占位符{evidence} → 填充为 {fill}",
+            "flag": "{cols}{rows}含占位符{evidence} → 打标保留，原因：{reason}",
+        },
+        "unit_scale": {
+            "fix": "{cols}{rows}{evidence} → {conv}",
+            "flag": "{cols}{rows}发现单位歧义{evidence} → 打标保留，原因：{reason}",
+        },
+        "date_format": {
+            "fix": "{cols}{rows}含格式不符的值{evidence} → 转换为 {conv}",
+            "flag": "{cols}{rows}含格式不符的值{evidence} → 打标保留，原因：{reason}",
+        },
+        "range_check": {
+            "fix": "{cols}{rows}越界{bounds} → 按边界裁剪",
+            "flag": "{cols}{rows}越界{bounds} → 打标保留，原因：{reason}",
+        },
+        "ohlc_contradiction": {
+            "fix": "{cols}{rows}矛盾 → 以收盘价为准修正",
+            "flag": "{cols}{rows}矛盾 → 打标保留，原因：{reason}",
+        },
     },
 }
 
 #: 模板缺失时的兜底（新增规则忘了写模板时可见，而不是静默退化成 event 格式）。
-FALLBACK_SUFFIX = "条变更（暂无日志模板，详见 events.jsonl）"
+FALLBACK_SUFFIX = {
+    "en": " changes (no log template yet, see events.jsonl)",
+    "zh": " 条变更（暂无日志模板，详见 events.jsonl）",
+}
 
 #: 末行固定提示：把「看终端」与「查事件流」两条路径接上。
-TRACE_LINE = "详细决策见 events.jsonl（按 rule_id 可直接检索原事件）"
+TRACE_LINE = {
+    "en": "full decisions: events.jsonl (search by rule_id)",
+    "zh": "详细决策见 events.jsonl（按 rule_id 可直接检索原事件）",
+}
 
 #: 变更记录里的非数据列：``dropped_row`` 的 ``col`` 是它，主键列也会出现在打标行里。
 RESERVED_COLUMNS = frozenset({"__row__"})
@@ -88,21 +138,22 @@ def narrate(
     if not groups:
         return []
 
+    lang = messages.language()
     notes = _decision_notes(events)
-    labels = {rule_id: _label_of(rule_id, profile) for rule_id, _ in groups}
+    labels = {rule_id: _label_of(rule_id, profile, lang) for rule_id, _ in groups}
     width = max(_display_width(label) for label in labels.values())
 
     lines: list[str] = []
     for (rule_id, action), group in groups.items():
         header = _header(labels[rule_id], width)
         rule_type = _rule_type(rule_id, profile)
-        template = NARRATIVE_TEMPLATES.get(rule_type, {}).get(action)
+        template = NARRATIVE_TEMPLATES[lang].get(rule_type, {}).get(action)
         if template is None:
-            lines.append(f"{header} {len(group)} {FALLBACK_SUFFIX}")
+            lines.append(f"{header} {len(group)}{FALLBACK_SUFFIX[lang]}")
             continue
-        fields = _template_fields(group, rule_type, profile, notes.get(rule_id) or {})
+        fields = _template_fields(group, rule_type, profile, notes.get(rule_id) or {}, lang)
         lines.append(f"{header} " + template.format(**fields))
-    lines.append(TRACE_LINE)
+    lines.append(TRACE_LINE[lang])
     return lines
 
 
@@ -134,8 +185,8 @@ def _rule_type(rule_id: str, profile: Any) -> str:
     return rule_id
 
 
-def _label_of(rule_id: str, profile: Any) -> str:
-    return LABELS.get(_rule_type(rule_id, profile), rule_id)
+def _label_of(rule_id: str, profile: Any, lang: str) -> str:
+    return LABELS[lang].get(_rule_type(rule_id, profile), rule_id)
 
 
 def _decision_notes(events: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -167,6 +218,7 @@ def _template_fields(
     rule_type: str,
     profile: Any,
     note: dict[str, Any],
+    lang: str,
 ) -> dict[str, Any]:
     """凑齐模板变量。所有键**始终存在**（缺值给空串），避免 ``str.format`` 抛 KeyError。"""
     key_columns = _key_columns(profile)
@@ -174,18 +226,20 @@ def _template_fields(
     # 目标态先查数据列，查不到再退到全组（含主键）：日期归一改的正是主键列「日期」，
     # 若只查数据列就拿不到 format / dtype。展示用 ``columns``，查 profile 才用 ``_all_columns``。
     options = _target_options(profile, columns) or _target_options(profile, _all_columns(group))
+    involved = len({str(change.get("row_key")) for change in group})
+    dropped = sum(1 for change in group if change.get("change_type") == "dropped_row")
     return {
-        "keys": _key_label(profile, key_columns),
-        "n": len({str(change.get("row_key")) for change in group}),
-        "m": sum(1 for change in group if change.get("change_type") == "dropped_row"),
+        "keys": _key_label(profile, key_columns, lang),
+        "rows": _rows_text(involved, lang),
+        "dropped": _rows_text(dropped, lang),
         # 数据列为空时退到全组列（日期归一只改主键列「日期」，否则会写成「相关列」）
-        "cols": _quote(columns or _all_columns(group)) or "相关列",
-        "evidence": _evidence(group, rule_type),
+        "cols": _quote(columns or _all_columns(group), lang) or ("the affected columns" if lang == "en" else "相关列"),
+        "evidence": _evidence(group, rule_type, lang),
         "fill": _fill_text(group),
-        "keep": _keep_text(profile, note),
-        "conv": _conversion(rule_type, profile, columns, options),
+        "keep": _keep_text(profile, note, lang),
+        "conv": _conversion(rule_type, profile, columns, options, lang),
         "bounds": _bounds(options),
-        "reason": str(note.get("reason") or "") or "需人工确认",
+        "reason": str(note.get("reason") or "") or ("needs a human decision" if lang == "en" else "需人工确认"),
     }
 
 
@@ -193,9 +247,9 @@ def _key_columns(profile: Any) -> list[str]:
     return [str(column) for column in getattr(profile, "key_columns", None) or []]
 
 
-def _key_label(profile: Any, key_columns: list[str]) -> str:
+def _key_label(profile: Any, key_columns: list[str], lang: str) -> str:
     label = str(getattr(profile, "key_label", "") or "")
-    return label or "、".join(key_columns) or "主键"
+    return label or "、".join(key_columns) or ("the key" if lang == "en" else "主键")
 
 
 def _columns(group: list[dict[str, Any]], key_columns: list[str]) -> list[str]:
@@ -236,29 +290,48 @@ def _target_options(profile: Any, columns: list[str]) -> dict[str, Any]:
     return {}
 
 
-def _quote(columns: Sequence[str]) -> str:
-    return "「" + "、".join(columns) + "」" if columns else ""
+def _quote(columns: Sequence[str], lang: str) -> str:
+    if not columns:
+        return ""
+    if lang == "en":
+        return '"' + ", ".join(columns) + '"'
+    return "「" + "、".join(columns) + "」"
 
 
-def _evidence(group: list[dict[str, Any]], rule_type: str) -> str:
+def _evidence(group: list[dict[str, Any]], rule_type: str, lang: str) -> str:
     """依据的数据侧痕迹：从 ``before`` 推「占位符内容 / 千分位 / 单位后缀 / 样例外」。
 
     纯启发式，**推不出就返回空串**（模板里该要素自然消失）：日志层不是判据层，
     宁可少说一句，也不能因为推导失败挡住运行或误报。
     """
     befores = [str(change.get("before")) for change in group if change.get("before") not in (None, "")]
+    quote_left, quote_right = ("「", "」") if lang == "zh" else ("'", "'")
     if rule_type == "missing_token":
-        return "".join(f"「{value}」" for value in list(dict.fromkeys(befores))[:2])
+        joiner = "" if lang == "zh" else " or "
+        return joiner.join(
+            f"{quote_left}{value}{quote_right}" for value in list(dict.fromkeys(befores))[:2]
+        )
     if rule_type == "date_format":
-        return f"（如「{befores[0]}」）" if befores else ""
+        if not befores:
+            return ""
+        return f"（如{quote_left}{befores[0]}{quote_right}）" if lang == "zh" else f" (e.g. {befores[0]})"
     if rule_type == "unit_scale":
         marks: list[str] = []
         if any("," in value or "，" in value for value in befores):
-            marks.append("千分位")
+            marks.append("千分位" if lang == "zh" else "thousands separators")
         if any(char in value for value in befores for char in "万亿"):
-            marks.append("单位后缀")
-        return "（含" + "、".join(marks or ["异常量级"]) + "）"
+            marks.append("单位后缀" if lang == "zh" else "unit suffixes")
+        if lang == "zh":
+            return "（含" + "、".join(marks or ["异常量级"]) + "）"
+        return " (contains " + ", ".join(marks or ["an unexpected magnitude"]) + ")"
     return ""
+
+
+def _rows_text(count: int, lang: str) -> str:
+    """``1 row`` / ``2 rows``（英文要单复数一致）；中文恒为 ``N 行``。"""
+    if lang == "zh":
+        return f"{count} 行"
+    return f"{count} row" if count == 1 else f"{count} rows"
 
 
 def _fill_text(group: list[dict[str, Any]]) -> str:
@@ -268,36 +341,47 @@ def _fill_text(group: list[dict[str, Any]]) -> str:
     return " / ".join(sorted(values)) if values else "NaN"
 
 
-def _keep_text(profile: Any, note: dict[str, Any]) -> str:
+def _keep_text(profile: Any, note: dict[str, Any], lang: str) -> str:
     """重复主键保留哪条：逐题覆盖（``events.params``）优先，其次 profile 的 policy。"""
     policy = getattr(profile, "policy", None) or {}
     value = str((note.get("params") or {}).get("duplicate_keep") or policy.get("duplicate_keep") or "first")
-    return {"first": "首条", "last": "最后一条"}.get(value, value)
+    names = {"first": "首条", "last": "最后一条"} if lang == "zh" else {"first": "the first", "last": "the last"}
+    return names.get(value, value)
 
 
-def _conversion(rule_type: str, profile: Any, columns: Sequence[str], options: dict[str, Any]) -> str:
+def _conversion(
+    rule_type: str,
+    profile: Any,
+    columns: Sequence[str],
+    options: dict[str, Any],
+    lang: str,
+) -> str:
     """结果侧的目标态：单位换算（源单位 / 系数 / 目标单位）或日期归一（dtype / 格式）。
 
-    每段都是可选的，缺一段就不写那一段；全缺时给一句「换算为目标单位」保底，
+    每段都是可选的，缺一段就不写那一段；全缺时给一句保底，
     保证 ``→`` 后面永远有内容（结果要素不能空）。
     """
+    joiner = "，" if lang == "zh" else ", "
     if rule_type == "unit_scale":
         scale = options.get("unit_scale") or {}
         source = str(scale.get("from") or "")
         unit = _unit_name(profile, columns) or str(options.get("unit") or "")
         parts: list[str] = []
         if source and unit:
-            parts.append(f"按 {source}→{unit} 折算")
+            parts.append(f"按 {source}→{unit} 折算" if lang == "zh" else f"converted {source} → {unit}")
         if scale.get("factor") is not None:
             parts.append(f"factor {scale['factor']}")
         if options.get("dtype"):
             parts.append(f"dtype {options['dtype']}")
-        return "，".join(parts) or "换算为目标单位"
+        return joiner.join(parts) or ("换算为目标单位" if lang == "zh" else "converted to the target unit")
 
     dtype = str(options.get("dtype") or "")
     fmt = str(options.get("format") or "")
-    parts = [value for value in (dtype, f"格式 {fmt}" if fmt else "") if value]
-    return "，".join(parts) or "目标格式"
+    if lang == "zh":
+        parts = [value for value in (dtype, f"格式 {fmt}" if fmt else "") if value]
+        return "，".join(parts) or "目标格式"
+    parts = [value for value in (dtype, f'format {fmt}' if fmt else "") if value]
+    return ", ".join(parts) or "the target format"
 
 
 def _unit_name(profile: Any, columns: Sequence[str]) -> str:

@@ -39,6 +39,8 @@ from .passport import (
     verify_exit_code,
     verify_passport,
 )
+from .messages import SUPPORTED_LANGUAGES, language as current_language
+from .messages import set_language, t
 from .narrate import narrate
 from .session import Session, open as open_session
 
@@ -53,47 +55,56 @@ def _parse_decision(raw: str, question: Any) -> tuple[str, dict[str, Any], str]:
     """
     text = raw.strip()
     if not text:
-        return "answer", {}, "cli 默认"
+        return "answer", {}, t("cli.reason.cli_default")
 
     head, _, tail = text.partition(":")
     params: dict[str, Any] = json.loads(tail) if tail.strip() else {}
     token = head.strip().lower()
 
     if token in {"s", "skip"}:
-        return "skip", params, "cli: skip"
+        return "skip", params, t("cli.reason.skip")
     if token in {"b", "batch", "batch_apply"}:
-        return "batch_apply", params, "cli: batch_apply"
+        return "batch_apply", params, t("cli.reason.batch")
     if token.isdigit():
         options = list(question.options or [])
         index = int(token) - 1
         if not 0 <= index < len(options):
-            raise ValueError(f"选项超出范围：{token}（共 {len(options)} 项）")
+            raise ValueError(t("cli.option_out_of_range", token=token, total=len(options)))
         label = options[index]
-        if "跳过" in label:
-            return "skip", params, f"cli: {label}"
+        # 「跳过」选项在两种语言里文案不同：按文案表判定，不按中文字面量判定
+        if label in {t("option.skip"), t("option.ohlc.skip")}:
+            return "skip", params, t("cli.reason.choice", label=label)
         if question.rule_id == "duplicate_key":
-            # 选项顺序由 session._rule_duplicate_key 固定（1=保留第一条，2=保留最后一条）。
-            # 中文文案留在展示层，会话层只认 first / last——所以这里做的是「选项 → 决策值」映射。
+            # 选项顺序由 session._gap_to_question 固定（1=保留第一条，2=保留最后一条）。
+            # 文案留在展示层，会话层只认 first / last——所以这里做的是「选项 → 决策值」映射。
             # 未选第 1/2 项时不传，交给 profile 的 policy.duplicate_keep 兜底。
             if index in (0, 1):
                 params.setdefault("duplicate_keep", "first" if index == 0 else "last")
-        return "answer", params, f"cli: {label}"
-    return "answer", params, f"cli: {text}"
+        return "answer", params, t("cli.reason.choice", label=label)
+    return "answer", params, t("cli.reason.choice", label=text)
 
 
 def _ask_interactively(session: Session) -> None:
     """逐题问，逐题答；stdin 提前结束时明确报错，而不是抛 EOFError 栈。"""
     while (question := session.next()) is not None:
-        print(f"\n[{question.rule_id}] 层级={question.aggregation_level} 影响 {len(question.affected_row_keys)} 行")
+        print(
+            "\n"
+            + t(
+                "cli.interactive.header",
+                rule=question.rule_id,
+                level=question.aggregation_level,
+                rows=len(question.affected_row_keys),
+            )
+        )
         for sample in (question.samples or [])[:3]:
-            print(f"    样本：{sample}")
+            print(t("cli.interactive.sample", sample=sample))
         for index, option in enumerate(question.options or [], start=1):
             print(f"  {index}) {option}")
         try:
-            raw = input("决策（序号 / answer / skip / batch[:json]）> ")
+            raw = input(t("cli.interactive.prompt"))
         except EOFError:
             remaining = len([q for q in session.queue if q.question_id not in session._answered])
-            raise SystemExit(f"决策输入不足：还剩 {remaining} 题未答（可用 --auto-only 或 questions.yaml）") from None
+            raise SystemExit(t("cli.interactive.eof", n=remaining)) from None
         action, params, reason = _parse_decision(raw, question)
         session.answer(question.question_id, action, params, reason)
 
@@ -144,8 +155,13 @@ def _print_summary(session: Session) -> None:
     idle_rules = total_rules - hit_rules
     unanswered = session.counts()["unanswered"]
     print(
-        f"[汇总] 检查 {total_rules} 条规则 / 触发 {hit_rules} 条 / "
-        f"未动 {idle_rules} 条 / 未答 {unanswered} 条"
+        t(
+            "cli.summary",
+            total=total_rules,
+            hit=hit_rules,
+            idle=idle_rules,
+            unanswered=unanswered,
+        )
     )
 
 
@@ -164,10 +180,13 @@ def _print_counts(session: Session) -> None:
     """三计数 + K 来源：三行分开打，便于 CI 里直接 grep。"""
     counts = session.counts()
     sources = session.unanswered_sources()
-    label = "、".join(f"{name}={value}" for name, value in sorted(sources.items())) or "（无）"
-    print(f"改动 {counts['fix']}")
-    print(f"flag {counts['flag']}")
-    print(f"未问 {counts['unanswered']}（来源：{label}）")
+    sep = "、" if current_language() == "zh" else ", "
+    label = sep.join(f"{name}={value}" for name, value in sorted(sources.items())) or t(
+        "cli.counts.no_source"
+    )
+    print(t("cli.counts.fix", n=counts["fix"]))
+    print(t("cli.counts.flag", n=counts["flag"]))
+    print(t("cli.counts.unanswered", n=counts["unanswered"], sources=label))
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
@@ -182,21 +201,26 @@ def _cmd_run(args: argparse.Namespace) -> int:
         auto_only=args.auto_only,
         max_questions_per_session=args.max_questions,
         dry_run=args.dry_run,
+        lang=getattr(args, "lang", None),
     )
     stats = session.start(resolve_auto=resolve_auto)
     # 问题数是**队列长度**（同一规则可以出多个问题：missing_token 每列一题），
     # 规则数是去重后的 rule_id 数——两个数不等是常态。这里把「几条规则」也写出来，
     # 否则读者会拿「问题 6 个」去数下面 5 行日志，误以为少了一条。
     print(
-        f"问题 {stats['total_questions']} 个 | 命中 {len(stats['rules_hit'])} 条规则："
-        f"{', '.join(stats['rules_hit']) or '（无）'}"
+        t(
+            "cli.question_line",
+            total=stats["total_questions"],
+            hit=len(stats["rules_hit"]),
+            names=", ".join(stats["rules_hit"]) or t("cli.counts.no_source"),
+        )
     )
 
     if args.resume_answers:
         answered = session.apply_answers_yaml(args.resume_answers)
-        print(f"回填 {answered} 题：{args.resume_answers}")
+        print(t("cli.resume.applied", n=answered, path=args.resume_answers))
     if args.questions:
-        print(f"问题清单：{session.export_questions_yaml(args.questions)}")
+        print(t("cli.questions.exported", path=session.export_questions_yaml(args.questions)))
     if args.interactive == "cli" and not args.auto_only and not args.resume_answers:
         _ask_interactively(session)
 
@@ -205,27 +229,38 @@ def _cmd_run(args: argparse.Namespace) -> int:
     _print_counts(session)
     written = session.export(args.out)
     code = _exit_code_of(written)
-    print(f"产物：{Path(written['passport']).parent} | 退出码 {code}")
+    print(t("cli.products", path=Path(written["passport"]).parent, code=code))
     return code
 
 
 def _cmd_resume(args: argparse.Namespace) -> int:
     payload_path = Path(args.state)
     if not payload_path.is_file():
-        print(f"缺少产物：{payload_path.name}")
+        print(t("cli.missing_answers", name=payload_path.name))
         return EXIT_FAIL
 
     payload = yaml.safe_load(payload_path.read_text(encoding="utf-8")) or {}
     if not payload.get("input"):
-        print("questions.yaml 缺少 input 字段")
+        print(t("cli.answers.no_input"))
         return EXIT_FAIL
 
-    session = open_session(payload["input"], profile=payload.get("profile", "a_stock_daily"))
+    session = open_session(
+        payload["input"],
+        profile=payload.get("profile", "a_stock_daily"),
+        lang=getattr(args, "lang", None),
+    )
     session.start()
     answered = session.apply_answers_yaml(payload_path)
     written = session.export(args.out)
     code = _exit_code_of(written)
-    print(f"回填 {answered} 题 | 产物：{Path(written['passport']).parent} | 退出码 {code}")
+    print(
+        t(
+            "cli.resume.done",
+            n=answered,
+            path=Path(written["passport"]).parent,
+            code=code,
+        )
+    )
     return code
 
 
@@ -238,11 +273,11 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     # 再调一次 verify_exit_code 等于把整轮 verify 跑两遍（实测各占一半耗时）。
     code = verify_exit_code(args.passport, input_path=args.input, result=result)
     if code == EXIT_OK:
-        print("verify 通过")
+        print(t("cli.verify.pass"))
     elif code == EXIT_UNRESOLVED:
-        print("verify 通过（存在未解决项，退出码 2）")
+        print(t("cli.verify.pass_unresolved"))
     else:
-        print("verify 失败")
+        print(t("cli.verify.fail"))
     return code
 
 
@@ -252,7 +287,7 @@ def _user_path(args: argparse.Namespace) -> str:
         value = getattr(args, attr, None)
         if value:
             return str(value)
-    return "（未提供路径）"
+    return t("cli.path.none")
 
 
 def _explain(exc: BaseException, args: argparse.Namespace) -> list[str] | None:
@@ -272,44 +307,34 @@ def _explain(exc: BaseException, args: argparse.Namespace) -> list[str] | None:
     # 顺序要紧：EmptyDataError / ParserError 都是 ValueError 的子类，排在 ValueError 前面
     # 才有机会给出比「列名不匹配」更准的话（空文件 vs 列数不齐是两种修法）。
     if isinstance(exc, pd.errors.EmptyDataError):
-        return [f"文件里没有可读的表头（空文件，或只有空行）：{path}", "换成「第一行是列名」的 CSV 再跑。"]
+        return [t("err.empty_csv", path=path), t("err.empty_csv.hint")]
     if isinstance(exc, pd.errors.ParserError):
-        return [
-            f"这个文件不是规整的 CSV：{path}",
-            "常见原因是某行比表头多出几列（字段里带了逗号却没加引号），或引号没闭合；"
-            "用表格软件打开看首尾几行。",
-        ]
+        return [t("err.parser", path=path), t("err.parser.hint")]
     if isinstance(exc, UnicodeDecodeError):
-        return [
-            f"文件不是 UTF-8 编码：{path}",
-            "Excel 另存的 CSV 默认是 GBK：用「另存为 → CSV UTF-8」重存，"
-            "或命令行 `iconv -f gbk -t utf-8 原文件 > 新文件.csv`。",
-        ]
+        return [t("err.encoding", path=path), t("err.encoding.hint")]
     if isinstance(exc, IsADirectoryError):
-        return [f"{path} 是个目录，不是文件", "路径要具体到文件名，比如 `data/pingan.csv`。"]
+        return [t("err.is_a_directory", path=path), t("err.is_a_directory.hint")]
     if isinstance(exc, FileNotFoundError):
         missing = getattr(exc, "filename", None) or path
-        return [f"找不到文件：{missing}", "检查路径；相对路径按「当前目录」解析，先 `pwd` 看一眼你在哪。"]
+        return [t("err.not_found", path=missing), t("err.not_found.hint")]
     if isinstance(exc, json.JSONDecodeError):
-        return [f"{path} 不是合法 JSON，文件可能被截断或改坏了"]
+        return [t("err.bad_json", path=path)]
     if isinstance(exc, yaml.YAMLError):
-        detail = str(exc).splitlines()[0] if str(exc) else "（无详细信息）"
-        return [
-            "yaml 解析失败（profile 或 questions.yaml 的缩进 / 冒号后空格写错了）",
-            f"{detail}——yaml 只认空格缩进，别用 tab。",
-        ]
+        detail = str(exc).splitlines()[0] if str(exc) else t("err.yaml.no_detail")
+        return [t("err.yaml"), t("err.yaml.hint", detail=detail)]
     if isinstance(exc, ValueError):
         # 走到这里基本是 profile 校验（「找不到 profile：x」「profile x 缺少必需列：y」），
-        # 加载器写的中文提示本身已经说明了「哪一步、缺什么」，原样透出即可。
+        # 加载器写的提示本身已经说明了「哪一步、缺什么」，原样透出即可。
+        # 注意：engine / profile 的报错目前只有中文（语言层不覆盖它们，见 messages.py 模块注释）。
         return [str(exc)]
     return None
 
 
 def _report_failure(lines: list[str]) -> None:
-    """打印失败提示：首行带 ``[失败]`` 前缀，其余缩进对齐（7 列 ≈ "[失败] " 的显示宽度）。"""
-    print(f"[失败] {lines[0]}", file=sys.stderr)
+    """打印失败提示：首行带前缀，其余缩进对齐（不随语言变，便于 CI grep）。"""
+    print(t("cli.fail.prefix", first=lines[0]), file=sys.stderr)
     for line in lines[1:]:
-        print(f"       {line}", file=sys.stderr)
+        print(t("cli.fail.more", line=line), file=sys.stderr)
 
 
 class _ArgumentParser(argparse.ArgumentParser):
@@ -324,42 +349,62 @@ class _ArgumentParser(argparse.ArgumentParser):
 
     def error(self, message: str) -> None:  # type: ignore[override]
         self.print_usage(sys.stderr)
-        self.exit(EXIT_FAIL, f"[失败] 参数有误：{self.prog}: {message}\n       用法见 `finpass --help`。\n")
+        self.exit(EXIT_FAIL, t("cli.usage.error", prog=self.prog, message=message))
+
+
+def _scan_lang(argv: Sequence[str]) -> str | None:
+    """构造 parser **之前**偷看一眼 ``--lang``，让 --help 和用法错误也用所选语言。
+
+    argparse 必须先建 parser 才能解析，而 help 文案是建 parser 时取好的——所以这里只认
+    这两种写法：``--lang zh`` / ``--lang=zh``。``--`` 之后是数据文件名，不再扫。
+    """
+    for position, token in enumerate(argv):
+        if token == "--":
+            break
+        if token == "--lang" and position + 1 < len(argv):
+            return argv[position + 1]
+        if token.startswith("--lang="):
+            return token.partition("=")[2]
+    return None
 
 
 def build_parser() -> argparse.ArgumentParser:
     """构造参数解析器（子命令 run / resume / verify）。"""
     parser = _ArgumentParser(
         prog="finpass",
-        description="承诺决策可追溯，不承诺自动得到正确答案。",
+        description=t("cli.description"),
     )
+    parser.add_argument("--lang", choices=SUPPORTED_LANGUAGES, default=None, help=t("cli.lang.help"))
     # 版本号取自 ``finpass.__version__``（pyproject 用 dynamic 引用同一处），
     # 所以这里不写字面量——报 bug 时用户贴 `finpass --version` 就够定位。
     parser.add_argument("--version", action="version", version=f"finpass {__version__}")
     subparsers = parser.add_subparsers(dest="command", metavar="{run,resume,verify}")
 
-    p_run = subparsers.add_parser("run", help="对输入数据跑五步内核：检测 / 决策 / 修复 / 复检 / 留痕")
-    p_run.add_argument("input", help="输入数据路径（CSV）")
-    p_run.add_argument("--profile", default="a_stock_daily", help="profile 名称或 yaml 路径")
-    p_run.add_argument("--out", default="out", help="产物输出目录")
-    p_run.add_argument("--interactive", choices=["none", "cli"], default="none", help="终端逐题问答通道")
-    p_run.add_argument("--questions", help="把待回答问题导出成 yaml，供离线填写")
-    p_run.add_argument("--resume-answers", help="直接按已填好的 questions.yaml 回填后导出")
-    p_run.add_argument("--auto-only", action="store_true", help="降级通道：只跑 mode: auto 的规则，其余打标")
+    p_run = subparsers.add_parser("run", help=t("cli.run.help"))
+    p_run.add_argument("--lang", choices=SUPPORTED_LANGUAGES, default=argparse.SUPPRESS, help=t("cli.lang.help"))
+    p_run.add_argument("input", help=t("cli.run.input"))
+    p_run.add_argument("--profile", default="a_stock_daily", help=t("cli.run.profile"))
+    p_run.add_argument("--out", default="out", help=t("cli.run.out"))
+    p_run.add_argument("--interactive", choices=["none", "cli"], default="none", help=t("cli.run.interactive"))
+    p_run.add_argument("--questions", help=t("cli.run.questions"))
+    p_run.add_argument("--resume-answers", help=t("cli.run.resume_answers"))
+    p_run.add_argument("--auto-only", action="store_true", help=t("cli.run.auto_only"))
     p_run.add_argument(
         "--dry-run",
         action="store_true",
-        help="只出拟改动清单：clean.csv 与输入逐字节一致，changes / passport 照常写",
+        help=t("cli.run.dry_run"),
     )
-    p_run.add_argument("--max-questions", type=int, default=50, help="单次会话最多回答多少题")
+    p_run.add_argument("--max-questions", type=int, default=50, help=t("cli.run.max_questions"))
 
-    p_resume = subparsers.add_parser("resume", help="从 questions.yaml 回填决策并继续导出")
-    p_resume.add_argument("state", help="questions.yaml 路径")
-    p_resume.add_argument("--out", default="out", help="产物输出目录")
+    p_resume = subparsers.add_parser("resume", help=t("cli.resume.help"))
+    p_resume.add_argument("--lang", choices=SUPPORTED_LANGUAGES, default=argparse.SUPPRESS, help=t("cli.lang.help"))
+    p_resume.add_argument("state", help=t("cli.resume.state"))
+    p_resume.add_argument("--out", default="out", help=t("cli.resume.out"))
 
-    p_verify = subparsers.add_parser("verify", help="按护照 replay，校验输出与变更记录逐单元格一致")
-    p_verify.add_argument("passport", help="passport.json 路径")
-    p_verify.add_argument("--input", help="原始 CSV 路径（旧护照没记录 input_path 时用）")
+    p_verify = subparsers.add_parser("verify", help=t("cli.verify.help"))
+    p_verify.add_argument("--lang", choices=SUPPORTED_LANGUAGES, default=argparse.SUPPRESS, help=t("cli.lang.help"))
+    p_verify.add_argument("passport", help=t("cli.verify.passport"))
+    p_verify.add_argument("--input", help=t("cli.verify.input"))
 
     return parser
 
@@ -370,13 +415,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     三道闸口都在这里，命令实现里只管「跑通」的那条路：
 
     1. 参数解析（用法错误 → 1，见 ``_ArgumentParser``）；
-    2. 用户可自修的运行时失败 → 一句中文 + 1（见 ``_explain``）；
+    2. 用户可自修的运行时失败 → 一句提示 + 1（见 ``_explain``）；
     3. 其余异常原样抛出——那是 bug，掩盖它只会让报 bug 的人更难查。
 
-    ``FINPASS_DEBUG=1`` 关掉第 2 道闸口，拿回完整 traceback。
+    ``--lang`` 优先于 ``FINPASS_LANG``；它在建 parser 前就先扫一遍（见 ``_scan_lang``），
+    这样 --help 与用法错误也是所选语言。``FINPASS_DEBUG=1`` 关掉第 2 道闸口，拿回完整 traceback。
     """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    requested = _scan_lang(argv)
+    if requested is not None:
+        set_language(requested)
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.lang is not None:
+        set_language(args.lang)
     if args.command is None:
         parser.print_help()
         return EXIT_OK

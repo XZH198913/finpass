@@ -98,3 +98,32 @@ def test_diff_marks_all_change_types(tmp_path: Path) -> None:
     # 4) 自包含：无 CDN / 外链资源
     assert "http://" not in html and "https://" not in html
     assert '<meta charset="utf-8">' in html
+
+
+def test_diff_legend_and_dropped_markers_in_english(tmp_path: Path, set_lang) -> None:
+    set_lang("en")
+    before = pd.DataFrame(
+        {
+            "日期": ["A", "B", "C"],
+            "收盘价": [1.0, 2.0, 3.0],
+            "成交量_股": [10, 20, 30],
+            "成交额_元": [100, 200, 300],
+        }
+    )
+    after = pd.DataFrame({"日期": ["A", "B"], "收盘价": [None, 2.5], "成交量_股": [10, 21]})
+    path = diff.render_diff_html(before, SYNTHETIC_CHANGES, tmp_path / "en.html", key="日期", final=after)
+    html = path.read_text(encoding="utf-8")
+
+    for label in (
+        "filled missing values",
+        "value changed",
+        "format / unit normalized",
+        "row dropped",
+        "flagged and kept",
+        "column dropped",
+    ):
+        assert label in html, f"英文图例缺 {label}"
+    assert "C (dropped)" in html
+    assert "column 成交额_元 (dropped)" in html
+    assert "缺失值填充" not in html
+

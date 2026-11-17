@@ -23,6 +23,7 @@ import yaml
 
 from .check_counts import validate_unanswered_source
 from .diff import render_diff_html
+from .messages import normalize, t
 from .engine import RULES_KEY, RULE_TYPES, aggregate, detect, dispatch, fix
 from .models import Gap, Question, UnansweredQuestion
 from .passport import row_keys, sha256_file, write_changes, write_events, write_passport
@@ -80,13 +81,18 @@ def frame_hash(df: pd.DataFrame) -> str:
 def _render_text(question: Question) -> str:
     """问题的纯文本卡片：无 widget 环境（CI / 纯终端）也能完整呈现。"""
     lines = [
-        f"[{question.rule_id}] 层级={question.aggregation_level} 影响 {len(question.affected_row_keys)} 行",
-        f"默认决策：{question.default}",
+        t(
+            "question.header",
+            rule=question.rule_id,
+            level=question.aggregation_level,
+            rows=len(question.affected_row_keys),
+        ),
+        t("question.default", default=question.default),
     ]
     for index, option in enumerate(question.options or [], start=1):
         lines.append(f"  {index}) {option}")
     for sample in (question.samples or [])[:3]:
-        lines.append(f"  样本：{sample}")
+        lines.append("  " + t("question.samples", samples=sample))
     return "\n".join(lines)
 
 
@@ -99,7 +105,10 @@ def _render_widget(question: Question) -> Any:
     return ipywidgets.VBox(
         [
             ipywidgets.HTML(f"<pre>{_html.escape(_render_text(question))}</pre>"),
-            ipywidgets.RadioButtons(options=list(question.options or []), description="决策"),
+            ipywidgets.RadioButtons(
+                options=list(question.options or []),
+                description=t("question.widget.description"),
+            ),
         ]
     )
 
@@ -128,6 +137,7 @@ class Session:
         auto_only: bool = False,
         dry_run: bool = False,
         passport_id_override: str | None = None,
+        lang: str | None = None,
     ) -> None:
         self.path = Path(path)
         self.profile_obj = load_profile(profile)
@@ -147,6 +157,9 @@ class Session:
         self.auto_only = auto_only
         self.dry_run = dry_run
         self.passport_id_override = passport_id_override
+        # 仅记录**显式**选的语言（CLI --lang）：护照里的复现命令要带上它。
+        # 环境变量 FINPASS_LANG 会被子进程继承，不必写进命令。
+        self.lang = normalize(lang) if lang else None
         self._passport_id_value: str | None = None
         self._auto_resolved = False
         self.answers_path: str | None = None
@@ -308,7 +321,7 @@ class Session:
             else:
                 changed = self._apply(q, decision_id, "skip", {})
                 action = "auto_flag"
-            reason = "auto_only：无人工决策" if self.auto_only else "默认路径：无人工决策"
+            reason = t("session.reason.auto_only") if self.auto_only else t("session.reason.default_path")
             self._record(q, action, {}, reason, decision_id, before_hash, changed)
 
     # ---------------------------------------------------------------- 计数
@@ -398,7 +411,7 @@ class Session:
                 item["question_id"],
                 answer.get("action", "skip"),
                 answer.get("params") or {},
-                answer.get("reason", "yaml 回填"),
+                answer.get("reason", t("session.reason.yaml")),
             )
             answered += 1
         return answered
@@ -406,6 +419,8 @@ class Session:
     def _replay_cmd(self, out_dir: Path) -> str:
         """写进护照的复现命令：由会话生成，调用方只读不拼。"""
         base = f"{shlex.quote(sys.executable)} -m finpass"
+        if self.lang:
+            base += f" --lang {shlex.quote(self.lang)}"
         out = shlex.quote(str(out_dir))
         dry = " --dry-run" if self.dry_run else ""
         if self.auto_only:
@@ -564,8 +579,12 @@ class Session:
                 aggregation_level="strategy",
                 affected_row_keys=keys.unique().tolist(),
                 samples=samples,
-                options=["保留第一条", "保留最后一条", "跳过打标"],
-                default="保留第一条",
+                options=[
+                    t("option.duplicate.first"),
+                    t("option.duplicate.last"),
+                    t("option.skip"),
+                ],
+                default=t("option.duplicate.first"),
             )
         if rule_type == "ohlc_contradiction":
             row_key = str(keys.iloc[0])
@@ -575,26 +594,32 @@ class Session:
                 aggregation_level="point",
                 affected_row_keys=[row_key],
                 samples=samples,
-                options=["标记跳过", "以收盘价为准修正"],
-                default="标记跳过",
+                options=[t("option.ohlc.skip"), t("option.ohlc.fix")],
+                default=t("option.ohlc.skip"),
             )
 
         col = gap.targets[0]
         if rule_type == "missing_token":
-            question_id, options, default = f"q_missing_{col}", ["填 NaN", "跳过打标"], "填 NaN"
+            question_id = f"q_missing_{col}"
+            options = [t("option.missing.fill"), t("option.skip")]
+            default = t("option.missing.fill")
         elif rule_type == "unit_scale":
             question_id = f"q_unit_{col}"
-            options, default = ["按万元折算异常行", "跳过打标"], "按万元折算异常行"
+            options = [t("option.unit.convert"), t("option.skip")]
+            default = t("option.unit.convert")
         elif rule_type == "date_format":
             # 文案与检测同源：值仍来自 target_state[列].format，这里只取来拼选项
             fmt = str(self._target_value(col, "format", gap.rule_id))
             question_id = f"q_date_{col}"
-            options, default = [f"转换为 {fmt}", "跳过打标"], f"转换为 {fmt}"
+            options = [t("option.date.convert", fmt=fmt), t("option.skip")]
+            default = t("option.date.convert", fmt=fmt)
         else:  # range_check：选项与默认值可由规则声明覆盖
+            # profile 自己写的 options / default 属于**用户数据**，不翻译；
+            # 只有没声明时才用文案表里的默认值。
             spec = self._spec(gap.rule_id)
             question_id = f"q_{gap.rule_id}_{col}"
-            options = list(spec.get("options") or ["按边界裁剪", "跳过打标"])
-            default = str(spec.get("default", "按边界裁剪"))
+            options = list(spec.get("options") or [t("option.range.clip"), t("option.skip")])
+            default = str(spec.get("default", t("option.range.clip")))
         return Question(
             question_id=question_id,
             rule_id=gap.rule_id,

@@ -8,6 +8,33 @@ such changes are called out explicitly.
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-11-17
+
+Bilingual release, published to PyPI.
+
+### Added
+
+- Bilingual terminal layer: `src/finpass/messages.py` holds aligned `en` / `zh` catalogs with
+  `t(...)`, `set_language()`, and missing-key errors. English is the default; select Chinese with
+  `FINPASS_LANG=zh` or the new `--lang {en,zh}` switch (also accepted after the subcommand, and
+  applied to `--help` and usage errors). An explicit `--lang` is recorded in
+  `passport.json.cli_replay_cmd` for reproducible runs.
+- English question cards, options, reasons, log lines, verify messages, and `diff.html` legend;
+  problem cards (`Question.render()`) and the widget label follow the selected language too.
+- `docs/after-log-cli.en.txt`: raw English terminal transcript of the default path; the existing
+  `docs/after-log-cli.txt` is kept as the Chinese baseline.
+- Bilingual test guards: catalog key/placeholder parity, language precedence and aliases, English
+  assertions for narration, verify, diff, question cards, date-option text, and CLI switches.
+
+### Changed
+
+- `README.md` now documents the language switches and shows English terminal samples; the old
+  "English catalog on the roadmap" note is gone.
+- `tests/test_capability_map.py` parses the English coverage table in `docs/internals.md`
+  (`## Rule coverage`), following its move out of `README.md` in 0.0.2.
+- Machine-readable outputs and exit-code semantics are unchanged; profile-declared `options` /
+  `default` remain user data and are never translated.
+
 ## [0.0.2] - 2026-11-16
 
 Documentation and packaging only; no behaviour change.

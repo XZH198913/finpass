@@ -195,3 +195,32 @@ def test_auto_only_applies_only_auto_rules(tmp_path: Path) -> None:
     assert set(by_rule["date_format"]) == {"normalized"}
     assert set(by_rule["duplicate_key"]) == {"flagged_kept"}
     assert set(by_rule["ohlc_contradiction"]) == {"flagged_kept"}
+
+
+def test_verify_messages_in_english(exported: dict[str, str], set_lang) -> None:
+    """verify 的每条结论都走文案表：默认英文、篡改提示、缺产物提示各有判据。"""
+    set_lang("en")
+    ok, messages = passport.verify_passport(exported["passport"])
+    assert ok, messages
+    assert {"hash OK", "replay OK", "events OK"} <= set(messages)
+
+    clean = Path(exported["clean"])
+    original = clean.read_text(encoding="utf-8")
+    clean.write_text(original.replace("10.0", "99.9", 1), encoding="utf-8")
+    try:
+        ok, messages = passport.verify_passport(exported["passport"])
+    finally:
+        clean.write_text(original, encoding="utf-8")
+    assert not ok
+    assert any("output_file_sha256 mismatch" in message for message in messages)
+
+    events = Path(exported["events"])
+    backup = events.read_bytes()
+    events.unlink()
+    try:
+        ok, messages = passport.verify_passport(exported["passport"])
+    finally:
+        events.write_bytes(backup)
+    assert not ok
+    assert messages == ["missing output: events.jsonl"]
+

@@ -23,6 +23,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .messages import t
 from .models import key_columns, row_keys
 from .passport_compat import FIELD_COMPAT
 
@@ -157,7 +158,7 @@ def replay_changes(
         if change_type == "dropped_row":
             idx = df.index[row_keys(df, keys) == str(change["row_key"])]
             if len(idx) == 0:
-                raise AssertionError(f"replay 找不到被删主键：{change['row_key']}")
+                raise AssertionError(t("replay.missing_dropped_key", row_key=change["row_key"]))
             df = df.drop(idx[-1])
             continue
 
@@ -169,11 +170,17 @@ def replay_changes(
             target = change["before"]
             idx = df.index[row_keys(df, keys) == str(target)]
         if len(idx) == 0:
-            raise AssertionError(f"replay 找不到主键：{target}")
+            raise AssertionError(t("replay.missing_key", row_key=target))
         current = df.at[idx[0], col]
         if not _same(current, change.get("before")):
             raise AssertionError(
-                f"before 不一致：{change['row_key']}.{col} 期望 {change.get('before')!r} 实际 {current!r}"
+                t(
+                    "replay.before_mismatch",
+                    row_key=change["row_key"],
+                    col=col,
+                    expected=change.get("before"),
+                    actual=current,
+                )
             )
 
         after = change.get("after")
@@ -300,9 +307,15 @@ def _frame_diff(rebuilt: Any, clean: Any, keys: list[str]) -> list[str]:
     是 O(行×列²) 次取值：5580×76 的产物实测单次要 8 分钟以上，占 verify 全部耗时。
     """
     if list(rebuilt.columns) != list(clean.columns):
-        return [f"列集合不一致：replay {list(rebuilt.columns)} != clean {list(clean.columns)}"]
+        return [
+            t(
+                "verify.columns",
+                replay=list(rebuilt.columns),
+                clean=list(clean.columns),
+            )
+        ]
     if len(rebuilt) != len(clean):
-        return [f"行数不一致：replay {len(rebuilt)} != clean {len(clean)}"]
+        return [t("verify.rows", replay=len(rebuilt), clean=len(clean))]
     columns = list(rebuilt.columns)
     if not columns or not len(rebuilt):
         return []
@@ -326,7 +339,15 @@ def _frame_diff(rebuilt: Any, clean: Any, keys: list[str]) -> list[str]:
         col = columns[col_index]
         left = rebuilt.iat[row_position, col_index]
         right = clean.iat[row_position, col_index]
-        problems.append(f"{rebuilt_keys.iloc[row_position]}.{col}（replay {left!r} != clean {right!r}）")
+        problems.append(
+            t(
+                "verify.cell_mismatch",
+                row_key=rebuilt_keys.iloc[row_position],
+                col=col,
+                replay=left,
+                clean=right,
+            )
+        )
     return problems
 
 
@@ -363,11 +384,11 @@ def _dry_run_problems(
         if position is None and aligned:
             position = original_positions.get(row_key)
         if position is None:
-            problems.append(f"dry-run：变更行 {row_key} 在产物中不可定位")
+            problems.append(t("verify.dryrun.row", row_key=row_key))
         elif col not in rebuilt.columns:
-            problems.append(f"dry-run：变更列 {col} 不在产物里")
+            problems.append(t("verify.dryrun.col", col=col))
         elif change.get("after") is not None and pd.isna(rebuilt.iloc[position][col]):
-            problems.append(f"dry-run：{row_key}.{col} replay 后为 NaN")
+            problems.append(t("verify.dryrun.nan", row_key=row_key, col=col))
         if len(problems) >= 5:
             break
     return problems
@@ -387,7 +408,7 @@ def verify_passport(passport_path: str | Path, input_path: str | Path | None = N
     """
     passport_path = Path(passport_path)
     if not passport_path.is_file():
-        return False, [f"缺少产物：{passport_path.name}（{passport_path}）"]
+        return False, [t("verify.missing_passport", name=passport_path.name, path=passport_path)]
     passport = read_passport(passport_path)
     out_dir = passport_path.parent
     stem = passport_path.name.removesuffix(".passport.json")
@@ -400,10 +421,10 @@ def verify_passport(passport_path: str | Path, input_path: str | Path | None = N
     if not passport.get("profile_schema_version"):
         behavior = FIELD_COMPAT["profile_schema_version"]
         if behavior == "warn":
-            messages.append("[warn] profile_schema_version 缺失，按 2.0.0 处理")
+            messages.append(t("verify.schema_warn"))
         elif behavior == "error":
             ok = False
-            messages.append("profile_schema_version 缺失（兼容表要求 error）")
+            messages.append(t("verify.schema_error"))
 
     artifacts = {
         "clean.csv": out_dir / f"{stem}.clean.csv",
@@ -412,7 +433,7 @@ def verify_passport(passport_path: str | Path, input_path: str | Path | None = N
     }
     absent = [name for name, path in artifacts.items() if not path.is_file()]
     if absent:
-        return False, [f"缺少产物：{name}" for name in absent]
+        return False, [t("verify.missing_artifact", name=name) for name in absent]
 
     dry_run = bool(passport.get("dry_run"))
 
@@ -424,25 +445,25 @@ def verify_passport(passport_path: str | Path, input_path: str | Path | None = N
         elif (out_dir / f"{stem}.csv").is_file():
             original_path = out_dir / f"{stem}.csv"
     if original_path is None or not original_path.is_file():
-        return False, [*messages, "无法定位原始 CSV（护照无 input_path，同目录也没有同名 csv）"]
+        return False, [*messages, t("verify.no_input")]
 
     expected_sha = passport.get("output_file_sha256")
     if not expected_sha:
-        messages.append("[warn] 旧护照无 output_file_sha256，跳过文件哈希校验")
+        messages.append(t("verify.old_passport"))
     elif sha256_file(artifacts["clean.csv"]) != expected_sha:
         ok = False
-        messages.append("output_file_sha256 不一致（clean.csv 与护照不配套）")
+        messages.append(t("verify.hash_mismatch"))
     else:
-        messages.append("hash OK")
+        messages.append(t("misc.hash_ok"))
 
     if dry_run:
         # 扩展点二（阶段 0 判据 4 / ext:dry_run）：dry-run 产物不改数据，
         # 所以 clean.csv 必须与输入逐字节相同——这是比「哈希配套」更强的一条。
         if sha256_file(artifacts["clean.csv"]) == sha256_file(original_path):
-            messages.append("dry-run：clean.csv 与输入逐字节一致")
+            messages.append(t("verify.dryrun_ok"))
         else:
             ok = False
-            messages.append("dry-run：clean.csv 与输入不一致（应逐字节相同）")
+            messages.append(t("verify.dryrun_mismatch"))
 
     original = pd.read_csv(original_path)
     keys = passport.get("keys") or ([passport["key"]] if passport.get("key") else [str(original.columns[0])])
@@ -462,14 +483,14 @@ def verify_passport(passport_path: str | Path, input_path: str | Path | None = N
             problems = _frame_diff(rebuilt, clean, keys)
     except AssertionError as exc:
         # replay 写值前会校验 before；before 对不上说明 changes 被改过，不是数据问题
-        return False, [*messages, f"replay 不一致：{exc}"]
+        return False, [*messages, t("verify.replay_mismatch", detail=exc)]
     except (KeyError, ValueError) as exc:
-        return False, [*messages, f"replay 失败：{exc}"]
+        return False, [*messages, t("verify.replay_failed", detail=exc)]
     if problems:
         ok = False
-        messages.extend(f"replay 不一致：{problem}" for problem in problems)
+        messages.extend(t("verify.replay_mismatch", detail=problem) for problem in problems)
     else:
-        messages.append("replay OK")
+        messages.append(t("misc.replay_ok"))
 
     event_ids: set[str] = set()
     for line in artifacts["events.jsonl"].read_text(encoding="utf-8").splitlines():
@@ -478,9 +499,9 @@ def verify_passport(passport_path: str | Path, input_path: str | Path | None = N
     orphan = sorted({str(change.get("decision_id")) for change in changes} - event_ids)
     if orphan:
         ok = False
-        messages.append(f"事件链断裂：变更 {orphan[0]} 找不到对应事件")
+        messages.append(t("verify.event_chain", decision_id=orphan[0]))
     else:
-        messages.append("events OK")
+        messages.append(t("misc.events_ok"))
 
     return ok, messages
 

@@ -11,3 +11,4 @@ build/
 .coverage
 # 开发工具的工作区（含 AI 助手的记忆文件），不进公开仓库
 .workbuddy/
+.codebuddy/

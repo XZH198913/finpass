@@ -15,12 +15,16 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from finpass import messages
 from finpass.models import make_change
 from finpass.narrate import TRACE_LINE, narrate
 from finpass.profile import load_profile
 
 A_STOCK = load_profile("a_stock_daily")
 FUTURES = load_profile("futures")
+
+#: 末行提示按语言分表；断言跟着**当前语言**走（conftest 钉成 zh）。
+TRACE = TRACE_LINE[messages.language()]
 
 
 def _change(
@@ -57,7 +61,7 @@ def test_every_line_has_the_four_elements() -> None:
     ]
     lines = _lines_with(changes, [_event("duplicate_key", "默认路径：无人工决策")])
 
-    body = [line for line in lines if line != TRACE_LINE]
+    body = [line for line in lines if line != TRACE]
     assert len(body) == 5, f"5 个规则分组应当各自一行，实际：{body}"
     for line in body:
         assert re.match(r"^\[[^\]]+\] ", line), f"缺动作标签：{line}"
@@ -65,7 +69,7 @@ def test_every_line_has_the_four_elements() -> None:
         assert any(marker in line for marker in ("发现", "含", "矛盾", "越界", "处")), f"缺依据：{line}"
         assert "→" in line, f"缺结果：{line}"
         assert "event_id" not in line, f"日志不该带审计标识：{line}"
-    assert lines[-1] == TRACE_LINE
+    assert lines[-1] == TRACE
 
 
 # ---------------------------------------------------------------- 标准 3：句式与产物同源
@@ -93,7 +97,7 @@ def test_missing_token_merges_columns_into_one_line() -> None:
     ]
 
     lines = _lines_with(changes)
-    body = [line for line in lines if line != TRACE_LINE]
+    body = [line for line in lines if line != TRACE]
     assert len(body) == 1, f"同一规则的多次触发应合并成一行：{body}"
     assert "「收盘价、成交额_元」" in body[0]
     assert "2 行" in body[0]
@@ -159,4 +163,34 @@ def test_unknown_rule_falls_back_instead_of_breaking() -> None:
 
     lines = _lines_with(changes)
     assert lines[0] == "[cashflow_threshold] 2 条变更（暂无日志模板，详见 events.jsonl）"
-    assert lines[-1] == TRACE_LINE
+    assert lines[-1] == TRACE
+
+
+def test_english_labels_templates_and_fallback(set_lang) -> None:
+    """英文路径要有独立判据：标签、句式、数量、末行提示、fallback 全走 en 表。"""
+    set_lang("en")
+    changes = [
+        _change("duplicate_key", "日期", None, None, "flagged_kept", "2024-03-14"),
+        _change("missing_token", "收盘价", "--", None, "filled_nan", "2024-03-12"),
+        _change("unit_ambiguity", "成交额_元", "12,000", "1200.0"),
+        _change("date_format", "日期", "2024/03/18", "2024-03-18", "normalized"),
+        _change("ohlc_contradiction", "最高价", None, None, "flagged_kept", "2024-03-15"),
+        _change("cashflow_threshold", "成交额_元", "1", "2"),
+        _change("cashflow_threshold", "成交额_元", "3", "4", row_key="r2"),
+    ]
+    lines = _lines_with(changes)
+
+    assert [line.split("]")[0] for line in lines[:5]] == [
+        "[dedupe",
+        "[fill",
+        "[unit",
+        "[date",
+        "[ohlc",
+    ]
+    assert 'key "日期": duplicates found (1 row involved)' in lines[0]
+    assert "1 row with placeholders '--'" in lines[1]
+    assert "converted to datetime64[ns], format %Y-%m-%d" in lines[3]
+    assert "2 changes (no log template yet, see events.jsonl)" == lines[5].split("] ", 1)[1]
+    assert lines[-1] == TRACE_LINE["en"]
+    assert all("→" in line for line in lines[:5])
+

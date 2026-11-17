@@ -15,6 +15,8 @@ from typing import Any
 
 import pandas as pd
 
+from .messages import t
+
 
 @dataclass
 class Question:
@@ -38,12 +40,17 @@ class Question:
         """纯文本问题卡片：不引 ipywidgets、不阻塞、无副作用。"""
         lines = [
             f"┌─ [{self.aggregation_level}] {self.rule_id}  ({self.question_id})",
-            f"│ 影响行数：{len(self.affected_row_keys)}    预估变更：{self.estimated_changes}",
+            t("question.card.stats", rows=len(self.affected_row_keys), n=self.estimated_changes),
         ]
         for sample in self.samples[:5]:
-            lines.append("│ 样本：" + "  ".join(f"{k}={v}" for k, v in sample.items()))
-        lines.append("│ 可选答案：" + " / ".join(self.options))
-        lines.append(f"│ 默认建议：{self.default}")
+            lines.append(
+                t(
+                    "question.card.samples",
+                    samples="  ".join(f"{k}={v}" for k, v in sample.items()),
+                )
+            )
+        lines.append(t("question.card.options", options=" / ".join(self.options)))
+        lines.append(t("question.card.default", default=self.default))
         lines.append("└" + "─" * 58)
         return "\n".join(lines)
 

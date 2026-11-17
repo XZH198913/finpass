@@ -13,6 +13,7 @@ from typing import Any
 
 import pandas as pd
 
+from .messages import t
 from .passport import replay_changes, row_keys
 
 COLOR_MAP = {
@@ -24,13 +25,14 @@ COLOR_MAP = {
     "dropped_col": "#e2e3e5",
 }
 
-_LEGEND = {
-    "filled_nan": "缺失值填充",
-    "changed_value": "值被修改",
-    "normalized": "格式/单位归一",
-    "dropped_row": "整行删除",
-    "flagged_kept": "跳过打标",
-    "dropped_col": "整列删除",
+#: 图例文案的文案表键（渲染时按当前语言取）。
+_LEGEND_KEYS = {
+    "filled_nan": "diff.legend.filled_nan",
+    "changed_value": "diff.legend.changed_value",
+    "normalized": "diff.legend.normalized",
+    "dropped_row": "diff.legend.dropped_row",
+    "flagged_kept": "diff.legend.flagged_kept",
+    "dropped_col": "diff.legend.dropped_col",
 }
 
 
@@ -118,19 +120,19 @@ def render_diff_html(
     for change in dropped_rows:
         rows.append(
             f'<tr style="background:{COLOR_MAP["dropped_row"]}"{_data_attrs(change, reasons)}>'
-            f'<td>{_html.escape(str(_get(change, "row_key")))}（已删除）</td>'
+            f'<td>{_html.escape(t("diff.dropped_row", row_key=_get(change, "row_key")))}</td>'
             f'<td colspan="{span}">{_html.escape(str(_get(change, "before")))}</td></tr>'
         )
     for change in dropped_cols:
         rows.append(
             f'<tr style="background:{COLOR_MAP["dropped_col"]}"{_data_attrs(change, reasons)}>'
-            f'<td>列 {_html.escape(str(_get(change, "col")))}（已删除）</td>'
+            f'<td>{_html.escape(t("diff.dropped_col", col=_get(change, "col")))}</td>'
             f'<td colspan="{span}">{_html.escape(str(_get(change, "before")))}</td></tr>'
         )
 
     legend = "".join(
         f'<span style="display:inline-block;margin-right:12px;padding:2px 8px;'
-        f'background:{color}">{_html.escape(_LEGEND[name])}</span>'
+        f'background:{color}">{_html.escape(t(_LEGEND_KEYS[name]))}</span>'
         for name, color in COLOR_MAP.items()
     )
     html = (

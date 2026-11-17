@@ -52,9 +52,10 @@ finpass/
 ## Rule coverage
 
 Landing status for the six rule types across four profiles. **The table is the source of truth**: it
-is parsed and asserted by `tests/test_capability_map.py`. Cells may only contain `完整` (complete),
-`部分` (partial), `未做` (not applicable to this profile), or `N/A`; the aggregate column takes the
-worst non-`N/A` cell (weakest-link rule).
+is parsed and asserted by `tests/test_capability_map.py`. Cells may only contain `complete`,
+`n/a to profile` (implemented but not declared by this profile), `incomplete` (aggregate only), or
+`N/A`. The aggregate column takes the weakest link: any `n/a to profile` makes it `incomplete`; all
+`N/A` stays `N/A`.
 
 | rule_type | a_stock_daily | a_stock_valuation | fund_nav | futures | Overall |
 |---|---|---|---|---|---|
